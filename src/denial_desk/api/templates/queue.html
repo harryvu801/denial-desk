@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Review queue · Denial Desk{% endblock %}
+{% block content %}
+<div class="stats">
+  <div class="stat"><div class="v">{{ stats.total }}</div><div class="k">denied lines ingested</div></div>
+  <div class="stat"><div class="v">{{ "%.0f"|format(stats.deterministic_share * 100) }}%</div>
+    <div class="k">resolved by rules, zero model spend</div></div>
+  <div class="stat"><div class="v">{{ stats.pending }}</div><div class="k">awaiting review</div></div>
+  <div class="stat"><div class="v">{{ stats.dollars_at_risk|money }}</div><div class="k">pending dollars at risk</div></div>
+</div>
+
+<form class="filters" method="get">
+  <select name="status">
+    {% for s in ["pending", "approved", "overridden", "rejected", ""] %}
+    <option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>{{ s or "any status" }}</option>
+    {% endfor %}
+  </select>
+  <select name="lane">
+    {% for l in ["", "deterministic", "human"] %}
+    <option value="{{ l }}" {% if filters.lane == l %}selected{% endif %}>{{ l or "any lane" }}</option>
+    {% endfor %}
+  </select>
+  <select name="payer">
+    <option value="">any payer</option>
+    {% for p in payers %}<option value="{{ p }}" {% if filters.payer == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+  </select>
+  <button type="submit">Filter</button>
+  <span class="muted">{{ rows|length }} shown, highest dollars first</span>
+</form>
+
+<div class="panel scroll">
+<table>
+  <thead><tr>
+    <th>Payer</th><th>Claim / line</th><th>Proc</th><th>CARC</th><th>RARC</th>
+    <th class="num">Denied</th><th>Lane</th><th>Proposal</th><th>Rule</th><th>Deadline</th><th>Status</th>
+  </tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>
+    <td>{{ r.payer }}</td>
+    <td><a href="/denials/{{ r.id }}">{{ r.line_control_number }}</a></td>
+    <td>{{ r.procedure_code }}</td>
+    <td>{{ r.primary_carc }}</td>
+    <td class="muted">{{ r.remark_codes or "—" }}</td>
+    <td class="num">{{ r.denied_amount|money }}</td>
+    <td><span class="badge {{ r.lane }}">{{ r.lane }}</span></td>
+    <td>{{ r.proposed_path|replace("_", " ") }}</td>
+    <td class="muted">{{ r.rule_id or "—" }}</td>
+    <td>{{ r.filing_deadline or "—" }}</td>
+    <td>{{ r.status }}{% if r.final_path %} → {{ r.final_path|replace("_", " ") }}{% endif %}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="11" class="muted">Nothing here. Run <code>make demo</code> to generate and ingest synthetic data.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

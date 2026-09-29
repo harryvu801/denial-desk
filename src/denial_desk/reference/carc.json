@@ -1,0 +1,21 @@
+{
+  "_source": "X12 Claim Adjustment Reason Codes, https://x12.org/codes/claim-adjustment-reason-codes. Descriptions shortened; only codes this system uses are included.",
+  "codes": [
+    {"code": "4",   "description": "The procedure code is inconsistent with the modifier used, or a required modifier is missing.", "effective_start": "1995-01-01"},
+    {"code": "16",  "description": "Claim/service lacks information or has submission/billing error(s).", "effective_start": "1995-01-01"},
+    {"code": "18",  "description": "Exact duplicate claim/service.", "effective_start": "1995-01-01"},
+    {"code": "22",  "description": "This care may be covered by another payer per coordination of benefits.", "effective_start": "1995-01-01"},
+    {"code": "27",  "description": "Expenses incurred after coverage terminated.", "effective_start": "1995-01-01"},
+    {"code": "29",  "description": "The time limit for filing has expired.", "effective_start": "1995-01-01"},
+    {"code": "31",  "description": "Patient cannot be identified as our insured.", "effective_start": "1995-01-01"},
+    {"code": "45",  "description": "Charge exceeds fee schedule/maximum allowable or contracted/legislated fee arrangement.", "effective_start": "1995-01-01"},
+    {"code": "50",  "description": "Non-covered: not deemed a medical necessity by the payer.", "effective_start": "1995-01-01"},
+    {"code": "96",  "description": "Non-covered charge(s).", "effective_start": "1995-01-01"},
+    {"code": "97",  "description": "Benefit for this service is included in the payment/allowance for another service already adjudicated.", "effective_start": "1995-01-01"},
+    {"code": "109", "description": "Claim/service not covered by this payer/contractor; send to the correct payer/contractor.", "effective_start": "1995-01-01"},
+    {"code": "119", "description": "Benefit maximum for this time period or occurrence has been reached.", "effective_start": "1995-01-01"},
+    {"code": "140", "description": "Patient/insured health identification number and name do not match.", "effective_start": "1995-01-01"},
+    {"code": "197", "description": "Precertification/notification/authorization/pre-treatment absent.", "effective_start": "2008-01-01"},
+    {"code": "198", "description": "Precertification/notification/authorization/pre-treatment exceeded.", "effective_start": "2008-01-01"}
+  ]
+}

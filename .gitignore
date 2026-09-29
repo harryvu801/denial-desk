@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# Environment
+.env
+.env.local
+
+# Data — synthetic output and downloaded corpora are regenerated, never committed
+data/synthetic/*
+!data/synthetic/.gitkeep
+data/corpus/*
+!data/corpus/.gitkeep
+
+# Eval run outputs are written here; summarized reports are committed by hand
+evals/results/*
+!evals/results/.gitkeep
+
+# Local tooling
+.DS_Store
+.vscode/
+*.db
+*.sqlite3
+
+# Terraform
+infra/terraform/.terraform/
+*.tfstate
+*.tfstate.*
+data/*.db

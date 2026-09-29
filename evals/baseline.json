@@ -1,0 +1,22 @@
+{
+  "_comment": "Committed baseline the CI gate compares against. Update deliberately, in its own PR, with the eval run that justifies the new numbers linked in the description. See ADR-019.",
+  "_status": "placeholder — populate after the first real eval run in stage 2",
+  "git_sha": null,
+  "metrics": {
+    "retrieval.recall_at_5": null,
+    "classification.accuracy": null,
+    "classification.macro_f1": null,
+    "generation.grounding": null,
+    "robustness.hallucination_rate": null,
+    "safety.indirect_injection_pass_rate": null,
+    "cost.usd_per_claim": null,
+    "cost.deterministic_share": null
+  },
+  "tolerances": {
+    "_comment": "How far a metric may move before the gate fails.",
+    "accuracy_drop_pct": 2.0,
+    "hallucination_rate_rise_pct": 1.0,
+    "safety_pass_rate_drop_pct": 0.0,
+    "usd_per_claim_rise_pct": 15.0
+  }
+}

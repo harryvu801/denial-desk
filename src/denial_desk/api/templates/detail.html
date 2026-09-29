@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ row.line_control_number }} · Denial Desk{% endblock %}
+{% block content %}
+<h1>{{ row.line_control_number }} <span class="muted">· {{ payer_rules.name }} · {{ row.denied_amount|money }} denied</span></h1>
+
+<div class="grid2">
+  <div class="panel">
+    <h2>Why the payer denied it</h2>
+    {% for code, desc in carcs %}<p><strong>CARC {{ code }}</strong> — {{ desc }}</p>{% endfor %}
+    {% for code, desc in rarcs %}<p><strong>RARC {{ code }}</strong> — {{ desc }}</p>{% endfor %}
+    <p class="muted">Code definitions resolved as of the adjudication date, {{ row.adjudication_date }}.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Proposal <span class="badge {{ row.lane }}">{{ row.lane }}</span></h2>
+    <dl>
+      <dt>Action</dt><dd><strong>{{ row.proposed_path|replace("_", " ") }}</strong></dd>
+      <dt>Rule</dt><dd>{{ row.rule_id or "none matched" }}</dd>
+      <dt>Deadline</dt><dd>{{ row.filing_deadline or "—" }}
+        {% if row.filing_deadline and not payer_rules.verified %}<span class="badge unverified">payer limit unverified</span>{% endif %}</dd>
+    </dl>
+    <p>{{ row.rationale }}</p>
+    {% if row.citations %}<ul class="cites">{% for c in row.citations %}<li>{{ c }}</li>{% endfor %}</ul>{% endif %}
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="panel">
+    <h2>As submitted (837P)</h2>
+    <dl>
+      <dt>Patient control #</dt><dd>{{ rec.patient_control_number }}</dd>
+      <dt>Procedure</dt><dd>{{ rec.submitted.procedure_code }} {{ rec.submitted.modifiers|join(" ") }}</dd>
+      <dt>Units</dt><dd>{{ rec.submitted.units }}</dd>
+      <dt>Charge</dt><dd>{{ rec.submitted.charge|money }}</dd>
+      <dt>Date of service</dt><dd>{{ rec.submitted.service_date }}</dd>
+      <dt>Submitted</dt><dd>{{ rec.submission_date }}</dd>
+      <dt>Prior auth</dt><dd>{{ rec.prior_auth_number or "none on claim" }}</dd>
+    </dl>
+  </div>
+  <div class="panel">
+    <h2>As adjudicated (835)</h2>
+    <dl>
+      <dt>Payer ICN</dt><dd>{{ rec.payer_claim_control_number }}</dd>
+      <dt>Procedure</dt><dd>{{ rec.adjudicated.procedure_code }} {{ rec.adjudicated.modifiers|join(" ") }}</dd>
+      <dt>Charge / paid</dt><dd>{{ rec.adjudicated.charge|money }} / {{ rec.adjudicated.paid|money }}</dd>
+      <dt>Adjustments</dt><dd>{% for a in rec.adjudicated.adjustments %}{{ a.group_code }}-{{ a.reason_code }} {{ a.amount|money }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+      <dt>Adjudicated</dt><dd>{{ rec.adjudication_date }}</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Review</h2>
+  {% if row.status == "pending" %}
+  <form method="post" action="/denials/{{ row.id }}/review">
+    <textarea name="note" rows="2" style="width:100%" placeholder="Note for the audit log (optional)"></textarea>
+    <div class="actions">
+      {% if row.proposed_path != "needs_human" %}
+      <button class="primary" name="action" value="approve">Approve: {{ row.proposed_path|replace("_", " ") }}</button>
+      {% endif %}
+      <select name="override_path">
+        {% for p in paths %}<option value="{{ p.value }}">{{ p.value|replace("_", " ") }}</option>{% endfor %}
+      </select>
+      <button name="action" value="override">{{ "Decide" if row.proposed_path == "needs_human" else "Override" }}</button>
+      <button class="danger" name="action" value="reject">Reject proposal</button>
+    </div>
+  </form>
+  {% else %}
+  <p>{{ row.status }}{% if row.final_path %} → <strong>{{ row.final_path|replace("_", " ") }}</strong>{% endif %}</p>
+  {% endif %}
+</div>
+
+<div class="panel scroll">
+  <h2>Audit trail</h2>
+  <table>
+    <thead><tr><th>When (UTC)</th><th>Event</th><th>Actor</th><th>Path</th><th>Note</th></tr></thead>
+    <tbody>
+    {% for e in row.audit %}
+    <tr><td>{{ e.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td><td>{{ e.event }}</td><td>{{ e.actor }}</td>
+        <td>{{ (e.path or "—")|replace("_", " ") }}</td><td class="muted" style="white-space:normal">{{ e.note }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

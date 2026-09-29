@@ -1,0 +1,123 @@
+# Deterministic denial playbook.
+#
+# Each entry claims: "for this CARC (plus any listed RARCs and condition), the correct next
+# action is fully determined and no model is needed." Anything not matched here goes to the
+# human review queue. See ADR-006, ADR-026.
+#
+# Citations: every entry cites the code definition it relies on. Actions are standard
+# billing practice for the cited code; payer-specific confirmation is pending where the
+# payer's rules are marked unverified in reference/payers.json, and the review screen shows
+# that. Every proposal is still reviewed by a person (ADR-007).
+#
+# Deliberately NOT in this playbook (judgment calls -> human): CARC 50 medical necessity,
+# 96 non-covered, 97 bundling, 198 units over authorization, 27 coverage terminated, and a
+# bare CARC 16 with no remark code.
+
+version: 1
+
+rules:
+  - id: timely-filing-late
+    match: {carc: "29", condition: submitted_after_initial_deadline}
+    action: write_off
+    rationale: >
+      Submitted after the payer's initial filing limit. No corrected-claim path exists; an
+      appeal succeeds only on documented good cause, which the reviewer can still choose.
+    citations:
+      - "X12 CARC 29: The time limit for filing has expired."
+
+  - id: timely-filing-payer-error
+    match: {carc: "29", condition: submitted_within_initial_deadline}
+    action: appeal
+    rationale: >
+      The 837 submission date is inside the payer's initial filing limit, so the timely
+      filing denial appears to be a payer error. Appeal with proof of timely submission.
+    citations:
+      - "X12 CARC 29: The time limit for filing has expired."
+
+  - id: duplicate-claim
+    match: {carc: "18"}
+    action: no_action
+    rationale: >
+      The original claim is already adjudicated and the balance lives there. Locate the
+      original; do not resubmit or appeal this one.
+    citations:
+      - "X12 CARC 18: Exact duplicate claim/service."
+
+  - id: missing-auth-not-on-claim
+    match: {carc: "197", condition: prior_auth_absent}
+    action: corrected_claim
+    rationale: >
+      The claim carried no authorization number (REF*G1). If an authorization was obtained,
+      submit a corrected claim with it. If none exists, the reviewer should write off.
+    citations:
+      - "X12 CARC 197: Precertification/notification/authorization/pre-treatment absent."
+
+  - id: missing-rendering-provider
+    match: {carc: "16", rarcs: ["N290"]}
+    action: corrected_claim
+    rationale: Add the rendering provider NPI (loop 2310B NM1*82) and resubmit.
+    citations:
+      - "X12 CARC 16: Claim/service lacks information or has submission/billing error(s)."
+      - "X12 RARC N290: Missing/incomplete/invalid rendering provider primary identifier."
+
+  - id: invalid-procedure-code
+    match: {carc: "16", rarcs: ["M51"]}
+    action: corrected_claim
+    rationale: Correct the procedure code on the line and resubmit.
+    citations:
+      - "X12 CARC 16: Claim/service lacks information or has submission/billing error(s)."
+      - "X12 RARC M51: Missing/incomplete/invalid procedure code(s)."
+
+  - id: unprocessable-claim
+    match: {carc: "16", rarcs: ["MA130"]}
+    action: corrected_claim
+    rationale: Unprocessable claim with no appeal rights; submit a new, complete claim.
+    citations:
+      - "X12 RARC MA130: Claim contains incomplete and/or invalid information; no appeal rights."
+
+  - id: modifier-missing-or-invalid
+    match: {carc: "4"}
+    action: corrected_claim
+    rationale: Add or correct the required modifier on the line and resubmit.
+    citations:
+      - "X12 CARC 4: Procedure code inconsistent with the modifier used, or a required modifier is missing."
+
+  - id: other-coverage-primary
+    match: {carc: "22"}
+    action: corrected_claim
+    rationale: >
+      Medicaid is payer of last resort. Bill the primary coverage, then resubmit to Medicaid
+      with the primary payer's adjudication (COB) attached.
+    citations:
+      - "X12 CARC 22: This care may be covered by another payer per coordination of benefits."
+      - "42 CFR 433.139 (Medicaid third-party liability; payer of last resort)."
+
+  - id: member-id-name-mismatch
+    match: {carc: "140"}
+    action: corrected_claim
+    rationale: Verify the member ID and name against the eligibility response and resubmit.
+    citations:
+      - "X12 CARC 140: Patient/insured health identification number and name do not match."
+
+  - id: patient-not-identified
+    match: {carc: "31"}
+    action: corrected_claim
+    rationale: Verify eligibility and the member ID, then resubmit.
+    citations:
+      - "X12 CARC 31: Patient cannot be identified as our insured."
+
+  - id: wrong-payer
+    match: {carc: "109"}
+    action: corrected_claim
+    rationale: Send the claim to the correct payer (for example the member's managed care plan).
+    citations:
+      - "X12 CARC 109: Claim/service not covered by this payer/contractor."
+
+  - id: benefit-maximum-reached
+    match: {carc: "119"}
+    action: write_off
+    rationale: >
+      The benefit limit for the period was already reached. Nothing on the claim can change
+      that; write off unless the reviewer has evidence the earlier usage was billed in error.
+    citations:
+      - "X12 CARC 119: Benefit maximum for this time period or occurrence has been reached."

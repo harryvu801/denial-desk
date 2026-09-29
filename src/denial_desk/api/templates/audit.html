@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Audit log · Denial Desk{% endblock %}
+{% block content %}
+<h1>Audit log <span class="muted">· append-only, latest 100</span></h1>
+<div class="panel scroll">
+<table>
+  <thead><tr><th>#</th><th>When (UTC)</th><th>Denial</th><th>Event</th><th>Actor</th><th>Lane</th><th>Path</th><th>Rule</th></tr></thead>
+  <tbody>
+  {% for e in events %}
+  <tr><td>{{ e.id }}</td><td>{{ e.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+      <td><a href="/denials/{{ e.denial_id }}">{{ e.denial_id }}</a></td><td>{{ e.event }}</td><td>{{ e.actor }}</td>
+      <td>{{ e.lane or "—" }}</td><td>{{ (e.path or "—")|replace("_", " ") }}</td><td class="muted">{{ e.rule_id or "—" }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

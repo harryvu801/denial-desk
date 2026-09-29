@@ -1,0 +1,12 @@
+{
+  "_source": "X12 Remittance Advice Remark Codes, https://x12.org/codes/remittance-advice-remark-codes. Descriptions shortened; only codes this system uses are included.",
+  "codes": [
+    {"code": "M51",  "description": "Missing/incomplete/invalid procedure code(s).", "effective_start": "1995-01-01"},
+    {"code": "M86",  "description": "Service denied because payment already made for same/similar procedure within set time frame.", "effective_start": "1995-01-01"},
+    {"code": "MA130","description": "Claim contains incomplete and/or invalid information; no appeal rights because the claim is unprocessable. Submit a new claim.", "effective_start": "1995-01-01"},
+    {"code": "N30",  "description": "Patient ineligible for this service.", "effective_start": "2002-01-01"},
+    {"code": "N54",  "description": "Claim information is inconsistent with pre-certified/authorized services.", "effective_start": "2002-01-01"},
+    {"code": "N290", "description": "Missing/incomplete/invalid rendering provider primary identifier.", "effective_start": "2005-01-01"},
+    {"code": "N362", "description": "The number of days or units of service exceeds our acceptable maximum.", "effective_start": "2005-01-01"}
+  ]
+}

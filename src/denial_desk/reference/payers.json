@@ -1,0 +1,44 @@
+{
+  "_comment": "Timely filing limits from public sources. 'verified' means the limit was confirmed against the cited public source; unverified entries are shown to reviewers as such. The federal floor (42 CFR 447.45(d)(1)) requires states to accept claims submitted within 12 months of the date of service.",
+  "payers": {
+    "UT": {
+      "name": "Utah Medicaid (fee-for-service)",
+      "initial_filing_limit": {"days": 365},
+      "correction_limit": {"days": 365},
+      "verified": true,
+      "citations": [
+        "Utah Medicaid Provider Agreement: amended claims accepted up to 365 days after date of service, https://medicaid.utah.gov/Documents/pdfs/agreement2011.pdf",
+        "42 CFR 447.45(d)(1), https://www.ecfr.gov/current/title-42/chapter-IV/subchapter-C/part-447/subpart-A/section-447.45"
+      ]
+    },
+    "AZ": {
+      "name": "AHCCCS (fee-for-service)",
+      "initial_filing_limit": {"months": 6},
+      "correction_limit": {"months": 12},
+      "verified": true,
+      "citations": [
+        "A.R.S. 36-2904(G); AHCCCS FFS Provider Billing Manual, Chapter 4 General Billing Rules, https://azahcccs.gov/PlansProviders/Downloads/FFSProviderManual/FFS_Chap04GeneralBillingRules.pdf"
+      ]
+    },
+    "NV": {
+      "name": "Nevada Medicaid (fee-for-service)",
+      "initial_filing_limit": {"days": 180},
+      "correction_limit": {"days": 180},
+      "verified": false,
+      "citations": [
+        "Nevada Medicaid and Nevada Check Up Billing Manual, timely filing (180 days from DOS in-state; 365 out-of-state/TPL), https://www.medicaid.nv.gov/Downloads/provider/NV_Billing_General_20190318.pdf",
+        "Correction window not separately confirmed; using the initial limit."
+      ]
+    },
+    "ID": {
+      "name": "Idaho Medicaid (fee-for-service)",
+      "initial_filing_limit": {"days": 365},
+      "correction_limit": {"days": 365},
+      "verified": false,
+      "citations": [
+        "42 CFR 447.45(d)(1) federal 12-month floor, https://www.ecfr.gov/current/title-42/chapter-IV/subchapter-C/part-447/subpart-A/section-447.45",
+        "Idaho manual section for the 12-month limit not yet confirmed."
+      ]
+    }
+  }
+}
