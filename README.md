@@ -38,6 +38,12 @@ adjudicated, the proposed action with its citations and computed filing deadline
 buttons: approve, override, or reject. Every decision is appended to an audit log that the
 database refuses to update or delete.
 
+![Review queue sorted by dollars at risk, with rules-lane and human-lane proposals](docs/screenshots/review-queue.png)
+
+| Rules lane: a cited, deterministic proposal | Human lane: no rule applies, a reviewer decides |
+|---|---|
+| ![Detail page for a CARC 119 denial with a write-off proposal](docs/screenshots/detail-rules-lane.png) | ![Detail page for a CARC 198 denial routed to a human](docs/screenshots/detail-human-lane.png) |
+
 ## Architecture
 
 ```
