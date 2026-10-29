@@ -17,6 +17,7 @@
       <dt>Action</dt><dd><strong>{{ row.proposed_path|replace("_", " ") }}</strong></dd>
       <dt>Rule</dt><dd>{{ row.rule_id or "none matched" }}</dd>
       <dt>Deadline</dt><dd>{{ row.filing_deadline or "—" }}
+        {% if row.status == "pending" and row.filing_deadline and row.filing_deadline < today() %}<span class="badge unverified">expired</span> {% endif %}
         {% if row.filing_deadline and not payer_rules.verified %}<span class="badge unverified">payer limit unverified</span>{% endif %}</dd>
     </dl>
     <p>{{ row.rationale }}</p>

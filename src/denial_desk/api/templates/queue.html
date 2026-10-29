@@ -46,7 +46,7 @@
     <td><span class="badge {{ r.lane }}">{{ r.lane }}</span></td>
     <td>{{ r.proposed_path|replace("_", " ") }}</td>
     <td class="muted">{{ r.rule_id or "—" }}</td>
-    <td>{{ r.filing_deadline or "—" }}</td>
+    <td>{{ r.filing_deadline or "—" }}{% if r.status == "pending" and r.filing_deadline and r.filing_deadline < today() %} <span class="badge unverified">expired</span>{% endif %}</td>
     <td>{{ r.status }}{% if r.final_path %} → {{ r.final_path|replace("_", " ") }}{% endif %}</td>
   </tr>
   {% else %}

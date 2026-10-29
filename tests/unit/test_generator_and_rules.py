@@ -81,7 +81,7 @@ def test_rules_lane_against_ground_truth(generated: Path) -> None:
         for r in map(json.loads, (generated / "labels.jsonl").open())
     }
     for d in denials:
-        res = triage(d)
+        res = triage(d, as_of=d.adjudication_date)
         cause = labels[(d.patient_control_number, d.line_control_number)]
         assert (res.lane, res.path) == EXPECTED[cause], cause
         if res.path is ResolutionPath.CORRECTED_CLAIM:

@@ -137,6 +137,13 @@ What is **not** in the playbook, by design: CARC 50 (medical necessity), 96, 97 
 198 (units over auth), 27 (coverage ended), bare CARC 16. Those are judgment and go to the
 human lane.
 
+**Time.** `triage(record, as_of=...)` takes the working date as a parameter instead of
+calling `date.today()`, so the same record and date always give the same proposal. If a
+corrected-claim deadline is already past on that date, the proposal becomes `needs_human`
+(keeping the rule id) because late filing is a good-cause judgment. Ingest uses today in
+production; synthetic data is *replayed*, each denial triaged as of its own 835 payment date.
+The screen separately badges pending items whose deadline has passed since ingest.
+
 Corrected-claim proposals get a deadline from the payer's correction window. Appeals don't
 get one yet: appeal windows weren't researched for the MVP, so the screen shows "—" rather
 than guessing.
@@ -217,6 +224,11 @@ SQLite at `data/denial_desk.db` (gitignored); delete it to reset. Postgres via
   and "claim control number" can mean either CLP01 or CLP07. ADR-028.
 - *Surprise worth keeping:* labeling synthetic denials by CARC would have made
   classification a field lookup. Labels are root causes now (ADR-027).
+
+- *Surprise worth keeping:* the first version proposed corrected claims whose deadlines
+  had already passed — nothing compared the deadline to a date. The first fix (one global
+  "working date" after the last remittance) was also wrong: the latest outlier set the date
+  for everyone. The right model is per-event: triage as of when the 835 arrived.
 
 ## 9. Open questions
 

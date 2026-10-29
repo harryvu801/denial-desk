@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ from denial_desk.ingest.pipeline import ingest_directory
 from denial_desk.persistence.store import make_engine, queue_stats, session_scope
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
+AS_OF = date(2026, 2, 15)
 
 
 @pytest.fixture
@@ -19,9 +21,9 @@ def engine(tmp_path: Path) -> Engine:
 
 def test_ingest_is_idempotent(engine: Engine) -> None:
     with session_scope(engine) as s:
-        first = ingest_directory(s, FIXTURES)
+        first = ingest_directory(s, FIXTURES, as_of=AS_OF)
     with session_scope(engine) as s:
-        second = ingest_directory(s, FIXTURES)
+        second = ingest_directory(s, FIXTURES, as_of=AS_OF)
         stats = queue_stats(s)
     assert first.denials_new == 2
     assert second.remittances_skipped == 1 and second.denials_new == 0
@@ -30,7 +32,7 @@ def test_ingest_is_idempotent(engine: Engine) -> None:
 
 def test_decision_audit_is_append_only(engine: Engine) -> None:
     with session_scope(engine) as s:
-        ingest_directory(s, FIXTURES)
+        ingest_directory(s, FIXTURES, as_of=AS_OF)
     for statement in ("UPDATE decision_audit SET note = 'x'", "DELETE FROM decision_audit"):
         with pytest.raises(DatabaseError, match="append-only"), engine.begin() as conn:
             conn.execute(text(statement))
@@ -39,7 +41,7 @@ def test_decision_audit_is_append_only(engine: Engine) -> None:
 def test_review_flow(tmp_path: Path) -> None:
     url = f"sqlite:///{tmp_path / 'api.db'}"
     with session_scope(make_engine(url)) as s:
-        ingest_directory(s, FIXTURES)
+        ingest_directory(s, FIXTURES, as_of=AS_OF)
     client = TestClient(create_app(url))
 
     assert client.get("/healthz").json() == {"status": "ok"}

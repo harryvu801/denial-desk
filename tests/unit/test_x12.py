@@ -4,11 +4,12 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from denial_desk.domain.models import GroupCode, Payer
+from denial_desk.domain.models import GroupCode, Lane, Payer, ResolutionPath
 from denial_desk.ingest.join import join
 from denial_desk.ingest.x12.parser_835 import parse_835, parse_cas
 from denial_desk.ingest.x12.parser_837p import parse_837p
 from denial_desk.ingest.x12.segments import Delimiters, Segment, X12Error, tokenize
+from denial_desk.triage.rules import triage
 
 
 def test_delimiters_are_read_from_isa(sample_835_raw: str) -> None:
@@ -98,3 +99,20 @@ def test_join_reports_unmatched_lines(sample_835_raw: str) -> None:
     denials, issues = join([], [parse_835(sample_835_raw)])
     assert denials == []
     assert {i.line_control_number for i in issues} == {"PCN-A-2", "PCN-B-1"}
+
+
+def test_expired_correction_window_goes_to_a_human(
+    sample_837_raw: str, sample_835_raw: str
+) -> None:
+    denials, _ = join(parse_837p(sample_837_raw), [parse_835(sample_835_raw)])
+    modifier_denial = next(d for d in denials if d.line_control_number == "PCN-A-2")
+
+    # Utah's correction window is 365 days from the 2026-01-06 date of service.
+    in_window = triage(modifier_denial, as_of=date(2027, 1, 6))
+    assert in_window.path is ResolutionPath.CORRECTED_CLAIM
+    assert in_window.filing_deadline == date(2027, 1, 6)
+
+    expired = triage(modifier_denial, as_of=date(2027, 1, 7))
+    assert (expired.lane, expired.path) == (Lane.HUMAN, ResolutionPath.NEEDS_HUMAN)
+    assert expired.rule_id == "modifier-missing-or-invalid"
+    assert "closed on 2027-01-06" in expired.rationale

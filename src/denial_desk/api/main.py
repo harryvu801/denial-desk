@@ -10,6 +10,7 @@ never opens a database.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from typing import Annotated
@@ -36,6 +37,9 @@ from denial_desk.persistence.store import (
 from denial_desk.reference import carc_table, payer_rules, rarc_table
 
 TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
+# Expiry on screen uses the real date: a deadline that was fine at ingest can pass while
+# the item waits in the queue.
+TEMPLATES.env.globals["today"] = date.today
 TEMPLATES.env.filters["money"] = lambda v: f"${Decimal(v):,.2f}"
 
 

@@ -9,6 +9,7 @@ See ADR-006, ADR-026.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import date
 from functools import cache
 from pathlib import Path
 
@@ -72,17 +73,19 @@ def load_playbook(path: Path = PLAYBOOK_PATH) -> Playbook:
     return playbook
 
 
-def triage(record: DenialRecord, playbook: Playbook | None = None) -> Resolution:
-    """Propose a resolution. First matching rule wins; no match means a human decides."""
+def triage(record: DenialRecord, *, as_of: date, playbook: Playbook | None = None) -> Resolution:
+    """Propose a resolution. First matching rule wins; no match means a human decides.
+
+    `as_of` is the working date the proposal is made on. It is a parameter rather than
+    `date.today()` so triage stays deterministic: the same record and date always give the
+    same answer, in tests, in eval runs, and in production.
+    """
     playbook = playbook or load_playbook()
     for rule in playbook.rules:
-        if rule.match.matches(record):
-            rules = payer_rules()[record.payer.value]
-            deadline = None
-            citations = rule.citations
-            if rule.action is ResolutionPath.CORRECTED_CLAIM:
-                deadline = rules.correction_deadline(record.submitted.service_date)
-                citations = (*citations, *rules.citations)
+        if not rule.match.matches(record):
+            continue
+        rules = payer_rules()[record.payer.value]
+        if rule.action is not ResolutionPath.CORRECTED_CLAIM:
             return Resolution(
                 patient_control_number=record.patient_control_number,
                 line_control_number=record.line_control_number,
@@ -90,9 +93,37 @@ def triage(record: DenialRecord, playbook: Playbook | None = None) -> Resolution
                 path=rule.action,
                 rule_id=rule.id,
                 rationale=rule.rationale.strip(),
+                citations=rule.citations,
+            )
+        deadline = rules.correction_deadline(record.submitted.service_date)
+        citations = (*rule.citations, *rules.citations)
+        if deadline < as_of:
+            # Proposing a correction that can no longer be filed is worse than proposing
+            # nothing: whether good cause exists for late filing is a human judgment.
+            return Resolution(
+                patient_control_number=record.patient_control_number,
+                line_control_number=record.line_control_number,
+                lane=Lane.HUMAN,
+                path=ResolutionPath.NEEDS_HUMAN,
+                rule_id=rule.id,
+                rationale=(
+                    f"Rule {rule.id} would propose a corrected claim, but the {rules.name}"
+                    f" correction window closed on {deadline} (working date {as_of})."
+                    " Late filing needs a good-cause decision."
+                ),
                 citations=citations,
                 filing_deadline=deadline,
             )
+        return Resolution(
+            patient_control_number=record.patient_control_number,
+            line_control_number=record.line_control_number,
+            lane=Lane.DETERMINISTIC,
+            path=rule.action,
+            rule_id=rule.id,
+            rationale=rule.rationale.strip(),
+            citations=citations,
+            filing_deadline=deadline,
+        )
     return Resolution(
         patient_control_number=record.patient_control_number,
         line_control_number=record.line_control_number,
