@@ -795,6 +795,44 @@ reported.
 
 ---
 
+## ADR-029 — Case files are the labeled source for the model lane
+
+**Status:** accepted
+
+**Context.** The model lane was meant to classify the denials the rules leave behind. In the
+synthetic data every human-lane CARC maps to exactly one root cause (198 is always units over
+authorization, 50 always medical necessity), so a lookup table would score 100% and the eval
+would measure nothing. The real judgment in those cases is the *action*, and the facts that
+decide it — an authorization extension, a retroactive eligibility span, documented need —
+did not exist anywhere in the data.
+
+**Decision.** The generator writes a case file for every denied line: authorizations,
+eligibility spans, EVV visit records and a short free-text care note. Each human-lane root
+cause has two variants that differ only in one planted fact, and the expected action goes in
+the labels, never in the case file. Where a fact suggests an action but a person should
+still decide (a retroactive reinstatement suggests a rebill), the expected action is
+`needs_human` and the suggestion is recorded but not scored. Case files use their own RNG
+seeded per line, so they never shift the claims. Tests check that every label's deciding
+fact is present in its case file.
+
+**Why.** It turns the model lane into a task where reading the evidence is necessary: the
+same CARC has two different correct actions, so a CARC-to-action lookup tops out near 50% on
+those causes. The care note is free text written by a third party, which is also the
+realistic surface for indirect prompt injection in stage 4.
+
+**Alternatives.** Add noise so CARCs map ambiguously to root causes — makes classification
+non-trivial, but the action still has no ground truth. Hand-label the action on the ~46
+human-lane denials — the most authentic labels, but too few to slice by cause or payer.
+
+**Consequences.** The variants are written by the same people who write the prompt, so the
+eval measures whether the model reads evidence, not whether it would cope with a real case
+file's mess. Say so next to every number. Distractor sentences in the notes help a little.
+
+**Revisit when.** Real (de-identified, licensed) case-file examples become available to
+compare against, or the model scores near 100% — which would mean the task is too easy.
+
+---
+
 ## Decisions still open
 
 Record these here as they are made, with the same format.

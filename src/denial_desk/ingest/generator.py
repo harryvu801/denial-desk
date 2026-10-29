@@ -22,9 +22,10 @@ from decimal import Decimal
 from pathlib import Path
 
 from denial_desk.domain.models import GroupCode, Payer
+from denial_desk.ingest.case_files import DeniedLineFacts, Expected, build_case_file
 from denial_desk.reference import payer_rules
 
-GENERATOR_VERSION = "0.1.0"
+GENERATOR_VERSION = "0.2.0"  # 0.2.0: case files + expected actions (ADR-029)
 START_DATE = date(2026, 1, 5)  # fixed, never date.today(): determinism
 PROVIDER_NPI = "1234567893"
 PAYER_NAMES = {
@@ -378,6 +379,25 @@ def _write_835(claims: list[_Claim], control: int) -> str:
     return _envelope(body, control, when, payer.value, "HP", "005010X221A1", "835")
 
 
+def _facts(claim: _Claim, line: _Line) -> DeniedLineFacts:
+    assert line.root_cause is not None
+    others = [p for p in PROCEDURES if p != line.procedure_code]
+    return DeniedLineFacts(
+        patient_control_number=claim.pcn,
+        line_control_number=line.line_control_number,
+        member_id=claim.member_id,
+        root_cause=line.root_cause,
+        procedure_code=line.procedure_code,
+        units=line.units,
+        # units_exceed_auth tripled the billed units; the original authorization covered a third.
+        authorized_units=line.units // 3 if line.root_cause == "units_exceed_auth" else line.units,
+        service_date=line.service_date,
+        adjudication_date=claim.payment_date,
+        prior_auth_number=claim.prior_auth,
+        other_procedure_code=others[int(line.line_control_number.rsplit("-", 1)[1]) % len(others)],
+    )
+
+
 def generate(out_dir: Path, n_claims: int, seed: int = 42) -> dict[str, int]:
     """Write paired 837P and 835 files plus a ground-truth manifest. Returns counts.
 
@@ -407,19 +427,28 @@ def generate(out_dir: Path, n_claims: int, seed: int = 42) -> dict[str, int]:
     for control, ((payer, when), group) in enumerate(sorted(by_payment.items()), start=1):
         (out_dir / f"{payer.value}_{when:%Y%m%d}.835").write_text(_write_835(group, control))
 
-    labels = [
-        {
-            "patient_control_number": c.pcn,
-            "line_control_number": ln.line_control_number,
-            "payer": c.payer.value,
-            "denied": ln.root_cause is not None,
-            "root_cause": ln.root_cause,
-            "carc": ln.carc,
-            "rarcs": list(ln.rarcs),
-        }
-        for c in claims
-        for ln in c.lines
-    ]
+    labels: list[dict[str, object]] = []
+    with (out_dir / "case_files.jsonl").open("w") as case_fh:
+        for c in claims:
+            for ln in c.lines:
+                expected: Expected | None = None
+                if ln.root_cause is not None:
+                    case_file, expected = build_case_file(seed, _facts(c, ln))
+                    case_fh.write(case_file.model_dump_json() + "\n")
+                labels.append(
+                    {
+                        "patient_control_number": c.pcn,
+                        "line_control_number": ln.line_control_number,
+                        "payer": c.payer.value,
+                        "denied": ln.root_cause is not None,
+                        "root_cause": ln.root_cause,
+                        "carc": ln.carc,
+                        "rarcs": list(ln.rarcs),
+                        "expected_action": expected.action.value if expected else None,
+                        "variant": expected.variant if expected else None,
+                        "suggestion": expected.suggestion if expected else None,
+                    }
+                )
     with (out_dir / "labels.jsonl").open("w") as fh:
         fh.writelines(json.dumps(row) + "\n" for row in labels)
     (out_dir / "manifest.json").write_text(

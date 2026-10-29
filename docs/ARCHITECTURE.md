@@ -193,6 +193,21 @@ Fourteen scenarios with declared weights (missing prior auth 18, timely filing 1
 12, …). The evidence is planted in the 837 where possible, so a classifier has to read the
 claim and not just the CARC.
 
+**Case files (generator 0.2.0, ADR-029).** Each denied line also gets a case file in
+`case_files.jsonl`: authorizations, eligibility spans, EVV visits, and a care note with one
+or two distractor sentences. Labels gain `expected_action`, `variant` and an unscored
+`suggestion`. The human-lane causes each have two variants that hinge on one fact:
+
+| Cause | Variant → expected action |
+|---|---|
+| Units over auth (198) | extension on file → corrected claim · no extension → write-off |
+| Coverage ended (27) | retroactive reinstatement → needs human (suggest rebill) · no coverage → write-off |
+| Medical necessity (50) | need documented → appeal · not supported → write-off |
+| Bundled (97) | distinct visits → appeal · overlapping visits → write-off |
+| Bare CARC 16 | member ID changed → corrected claim · unexplained → needs human |
+
+At 2,000 claims (seed 42): 183 human-lane cases across the ten variants.
+
 ### 5.2 What is measured today
 
 - Round-trip: generate → parse → join reproduces exactly the labeled denied lines, with
