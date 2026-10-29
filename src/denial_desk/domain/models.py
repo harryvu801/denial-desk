@@ -44,6 +44,27 @@ class ResolutionPath(StrEnum):
     NEEDS_HUMAN = "needs_human"
 
 
+class RootCause(StrEnum):
+    """Why a line was denied, at the level a billing team acts on. Several share a CARC
+    (CARC 16 covers three), which is what makes classification more than a lookup. ADR-027."""
+
+    MISSING_PRIOR_AUTH = "missing_prior_auth"
+    TIMELY_FILING = "timely_filing"
+    DUPLICATE_SUBMISSION = "duplicate_submission"
+    MISSING_RENDERING_NPI = "missing_rendering_npi"
+    MISSING_MODIFIER = "missing_modifier"
+    INVALID_PROCEDURE_CODE = "invalid_procedure_code"
+    OTHER_INSURANCE_PRIMARY = "other_insurance_primary"
+    COVERAGE_TERMINATED = "coverage_terminated"
+    UNITS_EXCEED_AUTH = "units_exceed_auth"
+    MEMBER_ID_MISMATCH = "member_id_mismatch"
+    FREQUENCY_LIMIT = "frequency_limit"
+    MEDICAL_NECESSITY = "medical_necessity"
+    BUNDLED_SERVICE = "bundled_service"
+    MISSING_INFORMATION_UNSPECIFIED = "missing_information_unspecified"
+    UNKNOWN = "unknown"
+
+
 class Lane(StrEnum):
     """Which lane proposed this resolution. Recorded on every record so the share of
     denials that never touched a model is a measured number. See ADR-006, ADR-026."""

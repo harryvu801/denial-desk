@@ -32,3 +32,4 @@ infra/terraform/.terraform/
 *.tfstate
 *.tfstate.*
 data/*.db
+data/eval/

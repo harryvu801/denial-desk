@@ -174,7 +174,23 @@ opens nothing. One DB transaction per request via a dependency. Routes: `/` queu
 status, lane, payer; sorted by dollars at risk), `/denials/{id}` detail + review form,
 `POST /denials/{id}/review`, `/audit`, `/healthz`.
 
-### 4.7 Not yet built
+### 4.7 `agent/` — the model lane (in progress)
+
+Only for denials the rules hand to a human. Not yet wired into the review queue.
+
+- `schemas.py` — `ModelProposal` (action, root cause, confidence, evidence paths, rationale)
+  and `strict_json_schema()`, which turns it into a structured-outputs schema: `$ref`s
+  inlined, every property required, unsupported keywords stripped (Pydantic re-checks them).
+- `prompts/classify/v1/` — `system.md` (the author's, not yet written; a placeholder the
+  live proposer refuses to send) and `user.md` (`<denial>` JSON, `<case_file>` JSON,
+  `<untrusted source="care_note">`). Each loaded prompt carries a hash of its text.
+- `input.py` — builds the request. Angle brackets in untrusted text are escaped so a care
+  note cannot close or forge a delimiter.
+- `proposer.py` — the `Proposer` protocol: live, recording, replay, stub (ADR-030). Live:
+  one retry on invalid output with the error fed back; refusal, truncation or a second
+  failure → `needs_human`.
+
+### 4.8 Not yet built
 
 `retrieval/`, `agent/`, `routing/`, `review/` (beyond the screen), `security/`, `obs/`, and
 `evals/` are stubs. See CLAUDE.md for the stage plan.
@@ -208,7 +224,18 @@ or two distractor sentences. Labels gain `expected_action`, `variant` and an uns
 
 At 2,000 claims (seed 42): 183 human-lane cases across the ten variants.
 
-### 5.2 What is measured today
+### 5.2 Model-lane accuracy suite
+
+`python -m evals.suites.accuracy [--proposer replay|stub|live] [--record]`. The eval set is
+the human-lane output of the real pipeline on seed 42 / 2,000 claims (183 cases). Three
+systems are scored on it: the model; `carc_majority`, the most common expected action per
+CARC fit on seed 7 (the "does reading the case file help" bar — **47.0%**); and
+`always_abstain` (25.1%, because 46 of 183 cases should go to a human). Model failures count
+as `needs_human`. Reported: accuracy, abstention precision/recall, accuracy by variant,
+root cause and payer, failures, cost per claim, p50/p95 latency. The run record (git SHA,
+prompt hash, model, effort, dataset seeds, settings minus secrets) goes to `evals/results/`.
+
+### 5.3 What is measured today
 
 - Round-trip: generate → parse → join reproduces exactly the labeled denied lines, with
   matching CARCs (unit test).

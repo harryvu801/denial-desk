@@ -833,6 +833,43 @@ compare against, or the model scores near 100% — which would mean the task is 
 
 ---
 
+## ADR-030 — Record once, replay everywhere; structured outputs, not a forced tool call
+
+**Status:** accepted
+
+**Context.** API usage is billed per call, and the author will not leave a key attached to a
+public repo or to CI. The project still has to show a real model lane with real numbers, and
+anyone cloning it should be able to reproduce the eval.
+
+**Decision.** The model sits behind a `Proposer` protocol with four implementations: live
+(Anthropic SDK), recording (wraps live, appends every call to a JSONL file), replay (serves
+that file) and stub (tests). Recordings are committed and keyed by (line, model, prompt
+hash), so a prompt edit can never be answered with a stale recording — replay reports
+`missing_recording` instead. A live run is done deliberately, once per prompt version, with
+a run-level dollar cap (`eval_max_usd`) enforced in the loop. The output contract is
+structured outputs (`output_config.format` with a strict JSON schema generated from the
+Pydantic model), validated again by Pydantic; one retry with the error fed back, then the
+denial goes to a human. Refusal and truncation also go to a human.
+
+**Why.** It separates *producing* evidence (costs money, done once, provenance recorded) from
+*reproducing* it (free, every run, every machine). Keying on the prompt hash is what makes
+the replay honest. Structured outputs, because Sonnet 5.5 rejects forced `tool_choice` and a
+tool the model may or may not call is a weaker contract than a constrained response.
+
+**Alternatives.** A local open-weights model — free, but weaker and a second integration to
+maintain; worth adding later as a comparison. A stub only — no evidence of anything. The
+server-side refusal fallback was considered and left off: a fallback would silently change
+which model produced a recorded answer, and here a refusal already has the right outcome —
+a person decides.
+
+**Consequences.** Recorded numbers are a snapshot of one model on one date; the run record
+says which. Re-recording after a prompt change costs roughly $1–3 for the 183-case set.
+
+**Revisit when.** The prompt stabilizes and CI should run a small live sample per PR
+(ADR-019) — that needs a CI secret with a hard spend limit.
+
+---
+
 ## Decisions still open
 
 Record these here as they are made, with the same format.
