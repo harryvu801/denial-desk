@@ -17,6 +17,7 @@ right methods satisfies it without inheriting from it.
 from __future__ import annotations
 
 import json
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -159,6 +160,7 @@ class RecordingProposer:
     def __init__(self, inner: Proposer, path: Path) -> None:
         self._inner = inner
         self._path = path
+        self._lock = threading.Lock()  # live runs call propose() from several threads
         path.parent.mkdir(parents=True, exist_ok=True)
 
     @property
@@ -176,7 +178,7 @@ class RecordingProposer:
                 "latency_ms": round(outcome.latency_ms, 1),
                 "attempts": outcome.attempts,
             }
-            with self._path.open("a") as fh:
+            with self._lock, self._path.open("a") as fh:
                 fh.write(json.dumps(row, sort_keys=True) + "\n")
         return outcome
 

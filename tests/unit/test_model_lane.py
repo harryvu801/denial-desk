@@ -10,7 +10,7 @@ from typing import Any, cast
 import pytest
 
 from denial_desk.agent.input import build_request, neutralize
-from denial_desk.agent.prompts import Prompt, load_prompt
+from denial_desk.agent.prompts import PLACEHOLDER_MARKER, Prompt, load_prompt
 from denial_desk.agent.proposer import (
     AnthropicProposer,
     Failure,
@@ -111,9 +111,9 @@ def test_refusal_and_truncation_fail_closed(case: EvalCase, stop: str, failure: 
 
 def test_placeholder_prompt_never_calls_the_api(case: EvalCase) -> None:
     client = FakeClient()
-    request = build_request(case.record, case.case_file, load_prompt("classify", "v1"))
-    assert request.prompt.is_placeholder  # remove this line once the real prompt exists
-    out = _proposer(client).propose(request)
+    placeholder = _prompt(f"{PLACEHOLDER_MARKER}\n<!-- notes -->")
+    assert placeholder.is_placeholder
+    out = _proposer(client).propose(build_request(case.record, case.case_file, placeholder))
     assert out.failure is Failure.PLACEHOLDER_PROMPT and client.calls == []
 
 

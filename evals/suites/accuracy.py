@@ -18,6 +18,7 @@ import json
 import statistics
 import subprocess
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -85,24 +86,33 @@ def _fmt(s: Score) -> str:
     return f"{s.accuracy:6.1%} ({s.correct}/{s.n})"
 
 
-def run(kind: str, model: str, record: bool, limit: int | None) -> dict[str, Any]:
+def run(
+    kind: str, model: str, record: bool, limit: int | None, concurrency: int = 8
+) -> dict[str, Any]:
     eval_set = build_eval_set(settings.eval_seed, settings.eval_claims)
     baseline = fit_carc_majority(build_eval_set(settings.baseline_fit_seed, settings.eval_claims))
     cases: list[EvalCase] = list(eval_set.cases[:limit] if limit else eval_set.cases)
     prompt = load_prompt("classify", settings.classify_prompt_version)
     proposer = make_proposer(kind, model, record)
 
+    requests = [build_request(c.record, c.case_file, prompt) for c in cases]
     outcomes: list[ProposalOutcome] = []
     spent = 0.0
+    # Batches of `concurrency` calls run in parallel threads (the SDK client is thread-safe);
+    # the budget is checked between batches, so it can overshoot by at most one batch.
+    batch = concurrency if kind == "live" else len(requests) or 1
     try:
-        for i, case in enumerate(cases, 1):
-            outcome = proposer.propose(build_request(case.record, case.case_file, prompt))
-            outcomes.append(outcome)
-            if kind == "live":
-                spent += usd(outcome)
-                print(f"  [{i}/{len(cases)}] {case.key} ${spent:.3f}", flush=True)
-                if spent >= settings.eval_max_usd:
-                    raise BudgetExceededError(f"stopped at ${spent:.2f} after {i} cases")
+        with ThreadPoolExecutor(max_workers=batch) as pool:
+            for start in range(0, len(requests), batch):
+                done = list(pool.map(proposer.propose, requests[start : start + batch]))
+                outcomes.extend(done)
+                if kind == "live":
+                    spent += sum(usd(o) for o in done)
+                    print(f"  [{len(outcomes)}/{len(requests)}] ${spent:.3f}", flush=True)
+                    if spent >= settings.eval_max_usd:
+                        raise BudgetExceededError(
+                            f"stopped at ${spent:.2f} after {len(outcomes)} cases"
+                        )
     except BudgetExceededError as exc:
         print(f"BUDGET: {exc}. Scoring the {len(outcomes)} cases completed.")
         cases = cases[: len(outcomes)]
@@ -198,9 +208,10 @@ def main() -> int:
     parser.add_argument("--model", default=settings.model_resolution)
     parser.add_argument("--record", action="store_true", help="with --proposer live")
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--concurrency", type=int, default=8)
     args = parser.parse_args()
 
-    result = run(args.proposer, args.model, args.record, args.limit)
+    result = run(args.proposer, args.model, args.record, args.limit, args.concurrency)
     print_report(result)
     RESULTS_DIR.mkdir(exist_ok=True)
     out = RESULTS_DIR / f"accuracy-{result['run_at'].replace(':', '')}-{args.proposer}.json"
