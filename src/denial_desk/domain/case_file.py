@@ -49,12 +49,24 @@ class Visit(BaseModel, frozen=True):
         return self
 
 
+class PaidService(BaseModel, frozen=True):
+    """A service the payer already paid, from the agency's own remittance history. Without
+    it a bundling denial (CARC 97) can't be decided: you need to know what it was bundled
+    into."""
+
+    payer_claim_control_number: str
+    service_date: date
+    procedure_code: str
+    units: int = Field(gt=0)
+
+
 class CaseFile(BaseModel, frozen=True):
     patient_control_number: str
     line_control_number: str
     authorizations: tuple[Authorization, ...] = ()
     eligibility: tuple[EligibilitySpan, ...] = ()
     visits: tuple[Visit, ...] = ()
+    paid_services: tuple[PaidService, ...] = ()
     care_note: str = Field(
         default="",
         description=(

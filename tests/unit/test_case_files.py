@@ -63,11 +63,14 @@ def test_planted_evidence_matches_label(cases: list[tuple[dict[str, object], Cas
                 assert "Physician order" in cf.care_note
             case "need_not_supported":
                 assert "not on the current care plan" in cf.care_note
+            case "distinct_visits" | "overlapping_visits" if not cf.paid_services:
+                raise AssertionError("a bundling case must say what the line was bundled into")
             case "distinct_visits":
                 a, b = cf.visits
                 assert not _overlap(a, b) and a.caregiver_id != b.caregiver_id
             case "overlapping_visits":
                 assert _overlap(*cf.visits)
+                assert cf.paid_services[0].procedure_code == cf.visits[1].procedure_code
             case "member_id_changed":
                 assert len({e.member_id for e in cf.eligibility}) == 2
             case "unexplained":

@@ -16,7 +16,13 @@ import random
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
-from denial_desk.domain.case_file import Authorization, CaseFile, EligibilitySpan, Visit
+from denial_desk.domain.case_file import (
+    Authorization,
+    CaseFile,
+    EligibilitySpan,
+    PaidService,
+    Visit,
+)
 from denial_desk.domain.models import ResolutionPath
 
 PROGRAM = "Medicaid HCBS waiver"
@@ -105,6 +111,7 @@ def build_case_file(seed: int, f: DeniedLineFacts) -> tuple[CaseFile, Expected]:
     ]
     eligibility = [EligibilitySpan(member_id=f.member_id, program=PROGRAM, start=date(2025, 7, 1))]
     visits = [_visit(dos, 9 * 60, f.units, caregiver, f.procedure_code)]
+    paid_services: list[PaidService] = []
     sentences = rng.sample(DISTRACTORS, k=rng.randint(1, 2))
     variant_a = rng.random() < 0.5
 
@@ -172,6 +179,16 @@ def build_case_file(seed: int, f: DeniedLineFacts) -> tuple[CaseFile, Expected]:
                 expected = Expected(ResolutionPath.WRITE_OFF, "need_not_supported")
 
         case "bundled_service":
+            # The service this line was bundled into, as the payer paid it (run 1: without
+            # this the case could not be decided, and the model rightly abstained).
+            paid_services.append(
+                PaidService(
+                    payer_claim_control_number=f"ICN{rng.randrange(10**8, 10**9)}",
+                    service_date=dos,
+                    procedure_code=f.other_procedure_code,
+                    units=4,
+                )
+            )
             if variant_a:
                 other_start = 9 * 60 + f.units * 15 + 60  # an hour after the first visit ends
                 visits.append(
@@ -215,6 +232,7 @@ def build_case_file(seed: int, f: DeniedLineFacts) -> tuple[CaseFile, Expected]:
             authorizations=tuple(authorizations),
             eligibility=tuple(eligibility),
             visits=tuple(visits),
+            paid_services=tuple(paid_services),
             care_note=" ".join(sentences),
         ),
         expected,

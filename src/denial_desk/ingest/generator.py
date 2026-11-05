@@ -25,7 +25,7 @@ from denial_desk.domain.models import GroupCode, Payer
 from denial_desk.ingest.case_files import DeniedLineFacts, Expected, build_case_file
 from denial_desk.reference import payer_rules
 
-GENERATOR_VERSION = "0.3.0"  # 0.3.0: visits match billed units; 0.2.0: case files (ADR-029)
+GENERATOR_VERSION = "0.4.0"  # 0.4: paid services; 0.3: visits match units; 0.2: case files
 START_DATE = date(2026, 1, 5)  # fixed, never date.today(): determinism
 PROVIDER_NPI = "1234567893"
 PAYER_NAMES = {
