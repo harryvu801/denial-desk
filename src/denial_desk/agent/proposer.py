@@ -81,16 +81,17 @@ def _failed(req: ProposalRequest, model: str, failure: Failure, raw: str = "") -
 
 class AnthropicProposer:
     def __init__(
-        self, client: anthropic.Anthropic, model: str, effort: Effort, max_tokens: int
+        self, client: anthropic.Anthropic, model: str, effort: Effort | None, max_tokens: int
     ) -> None:
         self._client = client
         self._model = model
         self._effort = effort
         self._max_tokens = max_tokens
         self._output_config: OutputConfigParam = {
-            "effort": effort,
             "format": {"type": "json_schema", "schema": strict_json_schema(ModelProposal)},
         }
+        if effort is not None:  # not every model accepts it (Haiku 4.5 returns a 400)
+            self._output_config["effort"] = effort
 
     @property
     def model(self) -> str:

@@ -39,7 +39,7 @@ from denial_desk.config import settings
 from denial_desk.domain.models import ResolutionPath, RootCause
 from denial_desk.security.budgets import BudgetExceededError
 from evals.cases import EvalCase, build_eval_set, fit_carc_majority
-from evals.metrics.classification import Score, abstention, by_slice, score
+from evals.metrics.classification import Score, abstention, by_slice, error_types, score
 
 RESULTS_DIR = Path(__file__).parent.parent / "results"
 
@@ -70,7 +70,8 @@ def make_proposer(kind: str, model: str, record: bool) -> Proposer:
     import anthropic  # only a live run needs the SDK client and credentials
 
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key or None)
-    live = AnthropicProposer(client, model, settings.model_effort, settings.model_max_tokens)
+    effort = None if model in settings.models_without_effort else settings.model_effort
+    live = AnthropicProposer(client, model, effort, settings.model_max_tokens)
     return RecordingProposer(live, path) if record else live
 
 
@@ -138,7 +139,7 @@ def run(
         "model": proposer.model,
         "prompt": prompt.id,
         "prompt_is_placeholder": prompt.is_placeholder,
-        "effort": settings.model_effort,
+        "effort": None if model in settings.models_without_effort else settings.model_effort,
         "dataset": {
             "seed": eval_set.seed,
             "n_claims": eval_set.n_claims,
@@ -148,6 +149,7 @@ def run(
         },
         "accuracy": {name: asdict(score(expected, p)) for name, p in predicted.items()},
         "abstention": {name: asdict(abstention(expected, p)) for name, p in predicted.items()},
+        "error_types": {name: asdict(error_types(expected, p)) for name, p in predicted.items()},
         "model_by_variant": {
             k: asdict(v)
             for k, v in by_slice(cases, expected, model_pred, lambda c: c.variant).items()
@@ -191,6 +193,10 @@ def print_report(r: dict[str, Any]) -> None:
         ab = r["abstention"][name]
         s = Score(acc["n"], acc["correct"])
         print(f"  {name:<16}{_fmt(s):<20}{ab['precision']:.0%} / {ab['recall']:.0%}")
+    print(f"\n  {'system':<16}{'correct':>8}{'needless':>10}{'missed':>8}{'WRONG':>7}")
+    for name, et in r["error_types"].items():
+        print(f"  {name:<16}{et['correct']:>8}{et['needless_handoff']:>10}"
+              f"{et['missed_handoff']:>8}{et['wrong_action']:>7}")  # fmt: skip
     for title, key in (("variant", "model_by_variant"), ("payer", "model_by_payer")):
         print(f"\n  model by {title}:")
         for name, v in r[key].items():

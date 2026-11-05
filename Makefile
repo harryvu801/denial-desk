@@ -34,7 +34,7 @@ gen-data:  ## Generate the synthetic 837P/835 corpus into data/synthetic
 ingest-corpus:  ## Download and index the public policy corpus into pgvector
 	uv run dd ingest-corpus
 
-eval-accuracy:  ## Offline accuracy suite against the golden sets
+eval-accuracy:  ## Model-lane accuracy, replayed from committed recordings (no API key)
 	uv run python -m evals.suites.accuracy
 
 eval-safety:  ## Red-team + adversarial suite

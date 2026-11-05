@@ -1,7 +1,7 @@
 # Denial Desk
 
-> **Status: working MVP — rules lane, human review queue, audit log.** The model lane and
-> the evaluation suites are next. **Synthetic data only. No PHI enters this system.**
+> **Status: rules lane, human review queue and audit log working; model lane evaluated, not
+> yet wired into the queue.** **Synthetic data only. No PHI enters this system.**
 
 Denial Desk reads Medicaid claim denials from X12 837P/835 files, works out what the payer
 refused and why, and proposes the next action: corrected claim, appeal, write-off, or "a human
@@ -10,24 +10,42 @@ payer.
 
 ## Results so far
 
-Measured on the default synthetic run (`make demo`: seed 42, 500 claims, 1,029 lines, 334
-denied):
+**Rules lane** — default synthetic run (`make demo`: seed 42, 500 claims, 334 denied lines):
 
 | | |
 |---|---|
 | Denials proposed by rules, **zero model spend** | **86%** (288 of 334) |
 | Rules-lane proposals matching the generator's ground truth | 100% (288 of 288) |
-| Denials routed to a human because no rule applies | 14% (46): medical necessity, bundling, units over authorization, coverage ended, unexplained CARC 16 |
-| Model calls per claim / USD per claim | 0 / $0.00 — there is no model lane yet |
-| Root-cause classification accuracy (model lane) | not built yet |
-| Prompt-injection red-team pass rate | not built yet |
+| Left for judgment | 14%: medical necessity, bundling, units over authorization, coverage ended, unexplained CARC 16 |
 
-**Read the 86% with care.** It comes from a denial mix I declared in the generator, not
-from real payer data. The generator never imports the rules, and the labels are root causes
-rather than CARCs (CARC 16 alone covers three different causes), but a different mix would
-give a different share. The 100% agreement is close to true by construction too: the rules
-and the scenarios encode the same billing knowledge. Real denials are messier, so treat
-every number here as an upper bound.
+**Model lane** — the denials the rules leave behind (183 cases from 2,000 claims), each with
+a case file of authorizations, eligibility, visit records and a care note.
+[Full report](docs/EVAL_REPORT.md).
+
+| | Sonnet 5.5 | Haiku 4.5 | CARC lookup baseline |
+|---|---|---|---|
+| Action accuracy | 44.3% | 50.8% | 47.0% |
+| **Wrong actions asserted** | **0** | 31 | 44 |
+| USD per claim | $0.0063 | $0.0026 | $0 |
+
+**Accuracy ranks these models backwards.** Haiku scores higher by asserting more, and 31 of
+its assertions are wrong — mostly appeals against denials the evidence supports. Sonnet
+asserted no wrong action; its misses are handoffs to a reviewer, and one policy it was never
+told (retroactive reinstatement should be suggested, not asserted). The worst slice for both
+models is that policy: 0 of 33.
+
+The first live run scored 33%, below the baseline. Reading the model's rationales found two
+bugs in the eval, not the model — a missing input field, and synthetic visit records that no
+longer matched billed units, which the model noticed and the tests had not.
+[Run 1 write-up](evals/history/2026-11-05-run1-sonnet-v1-gen0.2.0/README.md).
+
+**Read every number with care.** The denial mix, the case files and the prompt are written
+by the same people, so the rules-lane share is a property of the declared mix and the model
+numbers measure whether a model reads the evidence, not whether it copes with real data.
+Treat them as upper bounds. Prompt-injection red-teaming is not built yet.
+
+Every model number above reproduces with no API key: responses are recorded once and
+replayed (`make eval-accuracy`).
 
 ## What it looks like
 
@@ -75,9 +93,10 @@ internal guide: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 Requires Python 3.12 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-make install   # uv sync --all-extras
-make demo      # generate 500 synthetic claims, ingest them, serve http://localhost:8000
-make test      # 24 unit tests, no network, no database server
+make install        # uv sync --all-extras
+make demo           # generate 500 synthetic claims, ingest them, serve http://localhost:8000
+make test           # 41 unit tests, no network, no database server
+make eval-accuracy  # model-lane eval, replayed from committed recordings (no API key)
 ```
 
 ## Scope and honesty

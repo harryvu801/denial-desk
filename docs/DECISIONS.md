@@ -870,6 +870,36 @@ says which. Re-recording after a prompt change costs roughly $1–3 for the 183-
 
 ---
 
+## ADR-031 — Report error types; wrong actions is the number to drive to zero
+
+**Status:** accepted
+
+**Context.** Run 2 scored Haiku 4.5 at 50.8% and Sonnet 5.5 at 44.3%. Read case by case,
+Haiku asserted 31 wrong actions — mostly appeals against denials its own evidence supported
+— and Sonnet asserted none; its misses were handoffs to a reviewer.
+
+**Decision.** Every accuracy run reports four counts alongside accuracy: correct, needless
+handoff (abstained when the evidence settled it), missed handoff (asserted where a person
+should decide), and wrong action (asserted, and wrong). Wrong actions is the primary quality
+number for the model lane and the first candidate for a zero-tolerance gate (ADR-019).
+
+**Why.** The costs are asymmetric by two orders of magnitude: a wrong appeal or write-off
+loses money or credibility with a state payer, a needless handoff costs a reviewer a minute.
+A single accuracy number averages them as if they were equal, and here it ranked the models
+backwards. The routing design (ADR-024) already assumes cost-of-error matters; the eval has
+to measure it the same way.
+
+**Alternatives.** Accuracy alone — what ranked the models backwards. A weighted cost score —
+hides which kind of error moved; the counts stay legible and a cost view can be derived.
+
+**Consequences.** Model choice is not "highest accuracy". Sonnet is the default; Haiku
+stays a measured comparison.
+
+**Revisit when.** A judge or human labels exist for partially-correct handoffs (abstained,
+but named the right action in the rationale) — that is a fifth category worth counting.
+
+---
+
 ## Decisions still open
 
 Record these here as they are made, with the same format.

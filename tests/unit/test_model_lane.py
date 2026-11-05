@@ -20,7 +20,7 @@ from denial_desk.agent.proposer import (
 from denial_desk.agent.schemas import ModelProposal, strict_json_schema
 from denial_desk.domain.models import ResolutionPath, RootCause
 from evals.cases import EvalCase, build_eval_set, fit_carc_majority
-from evals.metrics.classification import abstention
+from evals.metrics.classification import abstention, error_types
 
 GOOD = json.dumps({
     "action": "corrected_claim", "root_cause": "units_exceed_auth", "confidence": 0.8,
@@ -150,3 +150,9 @@ def test_baseline_falls_back_to_needs_human_on_ties(tmp_path: Path) -> None:
     baseline = fit_carc_majority(build_eval_set(7, 300, tmp_path))
     assert set(baseline.values()) <= set(ResolutionPath)
     assert RootCause.UNKNOWN.value == "unknown"
+
+
+def test_error_types_separate_safe_and_dangerous_misses() -> None:
+    h, w, a = ResolutionPath.NEEDS_HUMAN, ResolutionPath.WRITE_OFF, ResolutionPath.APPEAL
+    et = error_types(expected=[w, w, h, w], predicted=[w, h, a, a])
+    assert (et.correct, et.needless_handoff, et.missed_handoff, et.wrong_action) == (1, 1, 1, 1)

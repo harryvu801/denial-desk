@@ -28,6 +28,7 @@ class Settings(BaseSettings):
 
     # Model lane (ADR-029, ADR-030).
     model_effort: Literal["low", "medium", "high", "xhigh", "max"] = "low"
+    models_without_effort: tuple[str, ...] = ("claude-haiku-4-5",)
     model_max_tokens: int = 4_000
     classify_prompt_version: str = "v1"
     # Committed: replaying these is how the demo and CI run the model lane with no key.

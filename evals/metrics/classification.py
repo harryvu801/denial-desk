@@ -70,3 +70,37 @@ def abstention(
         abstained=len(predicted_h),
         should_abstain=len(expected_h),
     )
+
+
+@dataclass(frozen=True)
+class ErrorTypes:
+    """Not all misses cost the same. Accuracy alone ranked run 2's models backwards.
+
+    correct           right action, or a correct handoff
+    needless_handoff  sent to a human when the evidence settled it — costs reviewer time
+    missed_handoff    asserted an action where a person should decide — skips a judgment
+    wrong_action      asserted the wrong action — the error that loses money or files
+                      a bad appeal; the one to drive toward zero
+    """
+
+    correct: int
+    needless_handoff: int
+    missed_handoff: int
+    wrong_action: int
+
+
+def error_types(
+    expected: Sequence[ResolutionPath], predicted: Sequence[ResolutionPath]
+) -> ErrorTypes:
+    human = ResolutionPath.NEEDS_HUMAN
+    counts = {"correct": 0, "needless_handoff": 0, "missed_handoff": 0, "wrong_action": 0}
+    for e, p in zip(expected, predicted, strict=True):
+        if e is p:
+            counts["correct"] += 1
+        elif p is human:
+            counts["needless_handoff"] += 1
+        elif e is human:
+            counts["missed_handoff"] += 1
+        else:
+            counts["wrong_action"] += 1
+    return ErrorTypes(**counts)
