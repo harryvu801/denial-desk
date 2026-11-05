@@ -6,9 +6,9 @@
                      and anyone cloning the repo use.
   StubProposer       a function you pass in. For tests and plumbing checks.
 
-Recordings are keyed by (line, model, prompt hash). Edit the prompt and the hash changes,
-so replay reports `missing_recording` instead of serving answers to a prompt that no
-longer exists.
+Recordings are keyed by (line, model, prompt id, hash of the full request). Change the
+prompt or the input data and the key changes, so replay reports `missing_recording`
+instead of serving an answer to a question that was never asked.
 
 `Protocol` is Python's structural interface: like a TypeScript interface, anything with the
 right methods satisfies it without inheriting from it.
@@ -152,8 +152,8 @@ class AnthropicProposer:
         return outcome(None, Failure.INVALID_OUTPUT, 2)
 
 
-def _key(line_control_number: str, model: str, prompt_id: str) -> str:
-    return f"{line_control_number}|{model}|{prompt_id}"
+def _key(request: ProposalRequest, model: str) -> str:
+    return f"{request.line_control_number}|{model}|{request.prompt.id}|{request.sha}"
 
 
 class RecordingProposer:
@@ -171,7 +171,7 @@ class RecordingProposer:
         outcome = self._inner.propose(request)
         if outcome.failure is not Failure.PLACEHOLDER_PROMPT:
             row = {
-                "key": _key(outcome.line_control_number, outcome.model, outcome.prompt_id),
+                "key": _key(request, outcome.model),
                 "raw": outcome.raw,
                 "failure": outcome.failure.value if outcome.failure else None,
                 "usage": asdict(outcome.usage),
@@ -197,7 +197,7 @@ class ReplayProposer:
         return self._model
 
     def propose(self, request: ProposalRequest) -> ProposalOutcome:
-        row = self._rows.get(_key(request.line_control_number, self._model, request.prompt.id))
+        row = self._rows.get(_key(request, self._model))
         if row is None:
             return _failed(request, self._model, Failure.MISSING_RECORDING)
         failure = Failure(row["failure"]) if row["failure"] else None

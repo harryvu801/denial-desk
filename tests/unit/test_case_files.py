@@ -79,6 +79,22 @@ def _minutes(v: Visit) -> float:
     return (datetime.combine(v.service_date, v.end) - start).total_seconds() / 60
 
 
+def test_visits_account_for_every_billed_unit(
+    cases: list[tuple[dict[str, object], CaseFile]],
+) -> None:
+    # Run 1 found visits clamped at 23:59 that no longer matched billed units. The first
+    # visit is always the denied service; its length must equal units x 15 minutes.
+    for label, cf in cases:
+        visit_units = _minutes(cf.visits[0]) / 15
+        authorized = cf.authorizations[0].units
+        if label["variant"] == "extension_on_file":
+            assert visit_units == sum(a.units for a in cf.authorizations)
+        elif label["variant"] == "no_extension":
+            assert visit_units == authorized + authorized // 2
+        else:
+            assert visit_units <= authorized
+
+
 def test_case_files_are_deterministic_and_do_not_shift_claims(tmp_path: Path) -> None:
     generate(tmp_path / "a", 80, seed=3)
     generate(tmp_path / "b", 80, seed=3)

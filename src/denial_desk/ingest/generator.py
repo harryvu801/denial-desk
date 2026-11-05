@@ -25,7 +25,7 @@ from denial_desk.domain.models import GroupCode, Payer
 from denial_desk.ingest.case_files import DeniedLineFacts, Expected, build_case_file
 from denial_desk.reference import payer_rules
 
-GENERATOR_VERSION = "0.2.0"  # 0.2.0: case files + expected actions (ADR-029)
+GENERATOR_VERSION = "0.3.0"  # 0.3.0: visits match billed units; 0.2.0: case files (ADR-029)
 START_DATE = date(2026, 1, 5)  # fixed, never date.today(): determinism
 PROVIDER_NPI = "1234567893"
 PAYER_NAMES = {
@@ -183,6 +183,7 @@ class _Line:
     cas: list[tuple[GroupCode, str, Decimal]] = field(default_factory=list)
     rarcs: tuple[str, ...] = ()
     root_cause: str | None = None
+    authorized_units: int | None = None  # set when billed units exceed the authorization
     carc: str | None = None
 
 
@@ -265,7 +266,10 @@ def _plant_evidence(rng: random.Random, claim: _Claim, scenario: Scenario) -> li
         case "invalid_procedure_code":
             targets[0].procedure_code = "T1099"  # not a code this program covers
         case "units_exceed_auth":
-            targets[0].units *= 3
+            # Bill 50% over the authorization: large enough to deny, small enough that the
+            # visit still fits in one day (0.2.0 tripled it and visits ran past midnight).
+            targets[0].authorized_units = targets[0].units
+            targets[0].units += targets[0].units // 2
             targets[0].charge = _money(
                 PROCEDURES.get(targets[0].procedure_code, Decimal(6))
                 * targets[0].units
@@ -389,8 +393,7 @@ def _facts(claim: _Claim, line: _Line) -> DeniedLineFacts:
         root_cause=line.root_cause,
         procedure_code=line.procedure_code,
         units=line.units,
-        # units_exceed_auth tripled the billed units; the original authorization covered a third.
-        authorized_units=line.units // 3 if line.root_cause == "units_exceed_auth" else line.units,
+        authorized_units=line.authorized_units or line.units,
         service_date=line.service_date,
         adjudication_date=claim.payment_date,
         prior_auth_number=claim.prior_auth,

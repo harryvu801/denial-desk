@@ -7,6 +7,7 @@ first. Structured facts go in as JSON so the model reads values, not prose about
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from typing import Any
@@ -23,6 +24,12 @@ class ProposalRequest:
     prompt: Prompt
     system: str
     user: str
+
+    @property
+    def sha(self) -> str:
+        """Hash of exactly what the model is sent. Replay is keyed on it, so a change to the
+        prompt *or* to the input data can never be answered from an old recording."""
+        return hashlib.sha256((self.system + "\0" + self.user).encode()).hexdigest()[:12]
 
 
 def neutralize(untrusted: str) -> str:
@@ -43,6 +50,7 @@ def denial_facts(record: DenialRecord) -> dict[str, Any]:
         "service_date": line.service_date.isoformat(),
         "submission_date": record.submission_date.isoformat(),
         "adjudication_date": as_of.isoformat(),
+        "member_id_on_claim": record.member_id,
         "prior_auth_on_claim": record.prior_auth_number,
         "carc": {
             "code": record.primary_carc,

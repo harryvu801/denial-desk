@@ -60,6 +60,7 @@ def join(
                         adjudicated=adj_line,
                         claim_adjustments=adj_claim.claim_adjustments,
                         claim_remark_codes=adj_claim.claim_remark_codes,
+                        member_id=claim.member_id,
                         prior_auth_number=claim.prior_auth_number,
                         submission_date=claim.submission_date,
                         adjudication_date=remit.payment_date,

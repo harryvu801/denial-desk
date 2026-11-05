@@ -189,6 +189,7 @@ class DenialRecord(BaseModel, frozen=True):
     adjudicated: AdjudicatedLine
     claim_adjustments: tuple[Adjustment, ...] = ()
     claim_remark_codes: tuple[str, ...] = ()
+    member_id: str = Field(description="Member ID as billed on the 837 (NM109, loop 2010BA)")
     prior_auth_number: str | None = None
     submission_date: date
     adjudication_date: date

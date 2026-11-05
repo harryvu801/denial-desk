@@ -1,0 +1,179 @@
+{
+  "run_at": "2026-11-05T18:12:21+00:00",
+  "git_sha": "7cbed6b-dirty",
+  "proposer": "live",
+  "model": "claude-sonnet-5-5",
+  "prompt": "classify/v1@8fdffd5b9cd9",
+  "prompt_is_placeholder": false,
+  "effort": "low",
+  "dataset": {
+    "seed": 42,
+    "n_claims": 2000,
+    "generator_version": "0.2.0",
+    "n_cases": 183,
+    "baseline_fit_seed": 7
+  },
+  "accuracy": {
+    "model": {
+      "n": 183,
+      "correct": 61
+    },
+    "carc_majority": {
+      "n": 183,
+      "correct": 86
+    },
+    "always_abstain": {
+      "n": 183,
+      "correct": 46
+    }
+  },
+  "abstention": {
+    "model": {
+      "precision": 0.1346153846153846,
+      "recall": 0.30434782608695654,
+      "abstained": 104,
+      "should_abstain": 46
+    },
+    "carc_majority": {
+      "precision": 0.46464646464646464,
+      "recall": 1.0,
+      "abstained": 99,
+      "should_abstain": 46
+    },
+    "always_abstain": {
+      "precision": 0.25136612021857924,
+      "recall": 1.0,
+      "abstained": 183,
+      "should_abstain": 46
+    }
+  },
+  "model_by_variant": {
+    "distinct_visits": {
+      "n": 15,
+      "correct": 0
+    },
+    "extension_on_file": {
+      "n": 20,
+      "correct": 4
+    },
+    "member_id_changed": {
+      "n": 18,
+      "correct": 0
+    },
+    "need_documented": {
+      "n": 12,
+      "correct": 11
+    },
+    "need_not_supported": {
+      "n": 9,
+      "correct": 0
+    },
+    "no_coverage": {
+      "n": 35,
+      "correct": 32
+    },
+    "no_extension": {
+      "n": 18,
+      "correct": 0
+    },
+    "overlapping_visits": {
+      "n": 10,
+      "correct": 0
+    },
+    "retro_reinstated": {
+      "n": 33,
+      "correct": 1
+    },
+    "unexplained": {
+      "n": 13,
+      "correct": 13
+    }
+  },
+  "model_by_root_cause": {
+    "bundled_service": {
+      "n": 25,
+      "correct": 0
+    },
+    "coverage_terminated": {
+      "n": 68,
+      "correct": 33
+    },
+    "medical_necessity": {
+      "n": 21,
+      "correct": 11
+    },
+    "missing_information_unspecified": {
+      "n": 31,
+      "correct": 13
+    },
+    "units_exceed_auth": {
+      "n": 38,
+      "correct": 4
+    }
+  },
+  "model_by_payer": {
+    "AZ": {
+      "n": 45,
+      "correct": 19
+    },
+    "ID": {
+      "n": 49,
+      "correct": 19
+    },
+    "NV": {
+      "n": 49,
+      "correct": 14
+    },
+    "UT": {
+      "n": 40,
+      "correct": 9
+    }
+  },
+  "failures": {},
+  "cost": {
+    "spent_usd_this_run": 1.1404,
+    "recorded_usd_total": 1.1404,
+    "recorded_usd_per_claim": 0.00623,
+    "input_tokens": 385270,
+    "output_tokens": 36984
+  },
+  "latency_ms": {
+    "p50": 2269.3240409716964,
+    "p95": 2866.4192077703774
+  },
+  "settings": {
+    "model_resolution": "claude-sonnet-5-5",
+    "model_judge": "claude-opus-5-5",
+    "database_url": "sqlite:///data/denial_desk.db",
+    "synthetic_data_dir": "data/synthetic",
+    "reviewer_name": "reviewer",
+    "max_agent_steps": 8,
+    "max_tokens_per_claim": 40000,
+    "max_usd_per_claim": 0.25,
+    "model_effort": "low",
+    "model_max_tokens": 4000,
+    "classify_prompt_version": "v1",
+    "recordings_dir": "data/recordings",
+    "model_prices_usd_per_mtok": {
+      "claude-opus-5-5": [
+        4.0,
+        20.0
+      ],
+      "claude-sonnet-5-5": [
+        2.0,
+        10.0
+      ],
+      "claude-haiku-4-5": [
+        1.0,
+        5.0
+      ]
+    },
+    "eval_seed": 42,
+    "eval_claims": 2000,
+    "baseline_fit_seed": 7,
+    "eval_max_usd": 3.0,
+    "retrieval_min_score": 0.35,
+    "log_redaction": "strict",
+    "langfuse_host": "https://cloud.langfuse.com"
+  }
+}

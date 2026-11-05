@@ -74,8 +74,10 @@ def _clock(minutes_after_midnight: int) -> time:
 
 
 def _visit(day: date, start_min: int, units: int, caregiver: str, procedure: str) -> Visit:
-    # Cap at 23:59 so long synthetic visits stay within one day.
-    end_min = min(start_min + units * 15, 23 * 60 + 59)
+    end_min = start_min + units * 15
+    if end_min >= 24 * 60:
+        # Clamping here once hid a data bug the model then caught (EVAL_REPORT run 1).
+        raise ValueError(f"{units} units from {_clock(start_min)} does not fit in one day")
     return Visit(
         service_date=day,
         start=_clock(start_min),

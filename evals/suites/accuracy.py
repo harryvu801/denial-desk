@@ -172,7 +172,7 @@ def run(
         },
         "latency_ms": {
             "p50": statistics.median(latencies) if latencies else 0.0,
-            "p95": latencies[int(0.95 * (len(latencies) - 1))] if latencies else 0.0,
+            "p95": statistics.quantiles(latencies, n=20)[-1] if len(latencies) > 1 else 0.0,
         },
         "settings": settings.model_dump(
             exclude={"anthropic_api_key", "langfuse_secret_key", "langfuse_public_key"}
