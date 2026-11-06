@@ -156,3 +156,12 @@ def test_error_types_separate_safe_and_dangerous_misses() -> None:
     h, w, a = ResolutionPath.NEEDS_HUMAN, ResolutionPath.WRITE_OFF, ResolutionPath.APPEAL
     et = error_types(expected=[w, w, h, w], predicted=[w, h, a, a])
     assert (et.correct, et.needless_handoff, et.missed_handoff, et.wrong_action) == (1, 1, 1, 1)
+
+
+def test_confidence_floor_only_turns_actions_into_handoffs() -> None:
+    from denial_desk.routing.confidence import apply_confidence_floor
+
+    a, h = ResolutionPath.APPEAL, ResolutionPath.NEEDS_HUMAN
+    assert apply_confidence_floor(a, 0.69, 0.7) is h
+    assert apply_confidence_floor(a, 0.7, 0.7) is a
+    assert apply_confidence_floor(h, 0.99, 0.7) is h

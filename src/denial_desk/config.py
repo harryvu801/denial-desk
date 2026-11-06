@@ -30,7 +30,10 @@ class Settings(BaseSettings):
     model_effort: Literal["low", "medium", "high", "xhigh", "max"] = "low"
     models_without_effort: tuple[str, ...] = ("claude-haiku-4-5",)
     model_max_tokens: int = 4_000
-    classify_prompt_version: str = "v1"
+    classify_prompt_version: str = "v2"
+    # Below this stated confidence a model proposal becomes needs_human (ADR-024). Chosen
+    # from the eval's threshold sweep, not guessed; 0.0 means "trust the model's action".
+    model_confidence_floor: float = 0.0
     # Committed: replaying these is how the demo and CI run the model lane with no key.
     recordings_dir: str = "data/recordings"
     # List prices, USD per million tokens (input, output). Used for cost per claim.
