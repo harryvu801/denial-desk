@@ -60,9 +60,24 @@ def test_review_flow(tmp_path: Path) -> None:
 
     # Overriding to NEEDS_HUMAN is not a decision.
     bad = client.post(
-        "/denials/2/review", data={"action": "override", "override_path": "needs_human"}
+        "/denials/2/review",
+        data={"action": "override", "override_path": "needs_human", "note": "x"},
     )
     assert bad.status_code == 422
+
+    # Disagreeing with a proposal needs a reason; the same request with a note goes through.
+    no_note = client.post("/denials/2/review", data={"action": "reject"})
+    assert no_note.status_code == 422
+    with_note = client.post(
+        "/denials/2/review",
+        data={"action": "reject", "note": "Payer error"},
+        follow_redirects=False,
+    )
+    assert with_note.status_code == 303
+
+    # One decision per denial: a second submission is refused, not appended.
+    again = client.post("/denials/2/review", data={"action": "reject", "note": "again"})
+    assert again.status_code == 409
     assert client.get("/audit").status_code == 200
 
 

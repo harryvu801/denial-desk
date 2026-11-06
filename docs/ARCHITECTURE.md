@@ -170,9 +170,16 @@ change that has to preserve data.
 
 FastAPI with Jinja templates, server-rendered (ADR-001). `create_app(database_url)` is a
 factory (`uvicorn … --factory`) so tests get an isolated database and importing the module
-opens nothing. One DB transaction per request via a dependency. Routes: `/` queue (filter by
-status, lane, payer; sorted by dollars at risk), `/denials/{id}` detail + review form,
-`POST /denials/{id}/review`, `/audit`, `/healthz`.
+opens nothing. One DB transaction per request via a dependency. Routes: `/` queue,
+`/denials/{id}` detail + review form, `POST /denials/{id}/review`, `/audit`, `/healthz`.
+
+The queue filters (status, lane, payer), searches (claim/line, procedure, CARC, RARC),
+sorts on any column through a whitelist of column keys, and pages 50 rows at a time, all in
+one query (`store.list_denials`). Stored values stay machine-friendly; templates show them
+through one `label` filter ("deterministic" displays as "Rules"). Review rules are enforced
+in `store.review`, not only in the page: an override or reject needs a note, approving a
+`needs_human` item is refused, and a denial can be decided once (a second submission is a
+409, so a double-click cannot append a conflicting decision to the audit log).
 
 ### 4.7 `agent/` — the model lane
 

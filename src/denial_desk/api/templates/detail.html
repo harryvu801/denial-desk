@@ -95,7 +95,10 @@
   <h2>Review</h2>
   {% if row.status == "pending" %}
   <form method="post" action="/denials/{{ row.id }}/review">
-    <textarea name="note" rows="2" style="width:100%" placeholder="Note for the audit log (optional)"></textarea>
+    <label for="review-note" class="visually-hidden">Note for the audit log</label>
+    <textarea id="review-note" name="note" rows="2" style="width:100%"
+      placeholder="{{ 'Note for the audit log (required to override or reject)' if row.proposed_path != 'needs_human' else 'Note for the audit log (required to reject)' }}"></textarea>
+    <p id="note-error" class="note-error" role="alert" hidden>Add a note explaining why before you {{ "override or reject" if row.proposed_path != "needs_human" else "reject" }}.</p>
     <div class="actions">
       {% if row.proposed_path != "needs_human" %}
       <button class="primary" name="action" value="approve">Approve: {{ row.proposed_path|label }}</button>
@@ -108,9 +111,10 @@
         {% for p in paths %}{% if p.value != row.proposed_path %}<option value="{{ p.value }}">{{ p.value|label }}</option>{% endif %}{% endfor %}
       </select></label>
       <button id="override-btn" name="action" value="override" disabled
+              {% if row.proposed_path != "needs_human" %}onclick="return requireNote()"{% endif %}
               {% if row.proposed_path == "needs_human" %}class="primary"{% endif %}>{{ "Decide" if row.proposed_path == "needs_human" else "Override" }}</button>
       <button class="danger" name="action" value="reject"
-              onclick="return confirm('Reject this proposal? The decision is permanent in the audit log.')">Reject proposal</button>
+              onclick="return requireNote() && confirm('Reject this proposal? The decision is permanent in the audit log.')">Reject proposal</button>
     </div>
   </form>
   {% else %}
@@ -130,4 +134,14 @@
     </tbody>
   </table>
 </div>
+<script>
+  // Mirrors the server rule in store.review(): disagreeing with a proposal needs a reason.
+  function requireNote() {
+    const note = document.getElementById("review-note");
+    const ok = note.value.trim().length > 0;
+    document.getElementById("note-error").hidden = ok;
+    if (!ok) note.focus();
+    return ok;
+  }
+</script>
 {% endblock %}

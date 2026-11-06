@@ -18,6 +18,10 @@ from denial_desk.domain.models import DenialRecord, Lane, Resolution, Resolution
 from denial_desk.persistence.models import Base, DecisionAudit, DenialRow, RemittanceRow
 
 
+class AlreadyDecidedError(Exception):
+    """A review was submitted for a denial that is no longer pending."""
+
+
 class ReviewAction(StrEnum):
     APPROVE = "approve"
     OVERRIDE = "override"
@@ -120,10 +124,23 @@ def review(
     note: str = "",
     override_path: ResolutionPath | None = None,
 ) -> DenialRow:
-    """Record a human decision. Nothing is submitted anywhere — see ADR-007."""
+    """Record a human decision. Nothing is submitted anywhere — see ADR-007.
+
+    Disagreeing with a proposal (override or reject) requires a note: the reason is the
+    label that later improves the rules and the prompt, and what an auditor asks for.
+    Deciding a needs_human item is not a disagreement, so its note stays optional."""
     row = session.get(DenialRow, denial_id)
     if row is None:
         raise LookupError(f"denial {denial_id} not found")
+    if row.status != "pending":
+        # One decision per denial: a double-click or a resubmitted form must not append a
+        # second, conflicting decision to the audit log.
+        raise AlreadyDecidedError(f"denial {denial_id} was already {row.status}")
+    disagrees = action is ReviewAction.REJECT or (
+        action is ReviewAction.OVERRIDE and row.proposed_path != ResolutionPath.NEEDS_HUMAN.value
+    )
+    if disagrees and not note.strip():
+        raise ValueError("a note is required to override or reject a proposal")
     if action is ReviewAction.OVERRIDE:
         if override_path is None or override_path is ResolutionPath.NEEDS_HUMAN:
             raise ValueError("an override needs a concrete resolution path")

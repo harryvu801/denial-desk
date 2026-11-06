@@ -27,6 +27,7 @@ from denial_desk.domain.models import Payer, ResolutionPath
 from denial_desk.persistence.models import DenialRow
 from denial_desk.persistence.store import (
     SORT_COLUMNS,
+    AlreadyDecidedError,
     ReviewAction,
     get_denial,
     list_denials,
@@ -226,6 +227,8 @@ def create_app(database_url: str | None = None) -> FastAPI:
             )
         except LookupError as exc:
             raise HTTPException(404, str(exc)) from exc
+        except AlreadyDecidedError as exc:
+            raise HTTPException(409, str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
         session.flush()
