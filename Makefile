@@ -24,12 +24,12 @@ typecheck:  ## Type check
 test:  ## Unit tests (no model calls)
 	uv run pytest
 
-demo:  ## Generate 500 synthetic claims, ingest them, and serve the review screen
+demo:  ## Rebuild the demo (2,000 synthetic claims, model lane replayed) and serve it
 	uv run dd demo
 	uv run uvicorn denial_desk.api.main:create_app --factory
 
 gen-data:  ## Generate the synthetic 837P/835 corpus into data/synthetic
-	uv run dd generate --claims 500 --seed 42
+	uv run dd generate --claims 2000 --seed 42
 
 ingest-corpus:  ## Download and index the public policy corpus into pgvector
 	uv run dd ingest-corpus

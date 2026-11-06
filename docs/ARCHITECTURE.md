@@ -174,9 +174,15 @@ opens nothing. One DB transaction per request via a dependency. Routes: `/` queu
 status, lane, payer; sorted by dollars at risk), `/denials/{id}` detail + review form,
 `POST /denials/{id}/review`, `/audit`, `/healthz`.
 
-### 4.7 `agent/` — the model lane (in progress)
+### 4.7 `agent/` — the model lane
 
-Only for denials the rules hand to a human. Not yet wired into the review queue.
+Only for denials the rules hand to a human. `lane.py` runs it inside ingest: the proposer
+(replay by default, so the demo needs no key) answers, `routing.apply_confidence_floor`
+turns a low-confidence action into a handoff, a corrected-claim deadline is computed in
+code, and the row stores the case file and the model's metadata (model, prompt, confidence,
+evidence paths, recorded cost). The audit actor is `model:<id>`. A handoff keeps the
+model's rationale for the reviewer. The demo uses the eval set's seed and size so every
+human-lane denial has a recording.
 
 - `schemas.py` — `ModelProposal` (action, root cause, confidence, evidence paths, rationale)
   and `strict_json_schema()`, which turns it into a structured-outputs schema: `$ref`s
@@ -271,6 +277,13 @@ SQLite at `data/denial_desk.db` (gitignored); delete it to reset. Postgres via
   had already passed — nothing compared the deadline to a date. The first fix (one global
   "working date" after the last remittance) was also wrong: the latest outlier set the date
   for everyone. The right model is per-event: triage as of when the 835 arrived.
+
+- *Surprise worth keeping:* SQLAlchemy's `JSON` column stores Python `None` as JSON `null`,
+  not SQL `NULL`, so `IS NOT NULL` matched every row. `JSON(none_as_null=True)`. A test on
+  the model lane caught it.
+- *Surprise worth keeping:* scaling the demo to 2,000 claims surfaced one rules-lane
+  "disagreement" with ground truth. The rule was right: timely filing is per line, and the
+  generator had judged a multi-line claim late from its first line's date of service.
 
 ## 9. Open questions
 

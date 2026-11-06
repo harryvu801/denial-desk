@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     # SQLite by default so the demo runs with no Docker; Postgres works via DATABASE_URL.
     database_url: str = "sqlite:///data/denial_desk.db"
     synthetic_data_dir: str = "data/synthetic"
+    # The demo uses the eval set's seed and size so its human-lane denials are exactly the
+    # ones with committed model recordings.
+    demo_seed: int = 42
+    demo_claims: int = 2_000
     reviewer_name: str = "reviewer"
 
     # Budgets — enforced, not advisory. See ADR-018.
@@ -34,6 +38,9 @@ class Settings(BaseSettings):
     # Below this stated confidence a model proposal becomes needs_human (ADR-024). Chosen
     # from the eval's threshold sweep, not guessed; 0.0 means "trust the model's action".
     model_confidence_floor: float = 0.0
+    # How ingest runs the model lane: "replay" serves committed recordings (no key, no
+    # cost), "live" calls the API, "off" leaves every unmatched denial to a human.
+    model_lane: Literal["off", "replay", "live"] = "replay"
     # Committed: replaying these is how the demo and CI run the model lane with no key.
     recordings_dir: str = "data/recordings"
     # List prices, USD per million tokens (input, output). Used for cost per claim.

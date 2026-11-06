@@ -91,3 +91,21 @@ def test_rules_lane_against_ground_truth(generated: Path) -> None:
 def test_every_rule_cites_something() -> None:
     assert all(rule.citations for rule in load_playbook().rules)
     assert 12 <= len(load_playbook().rules) <= 20
+
+
+def test_timely_filing_labels_are_late_for_every_line(generated: Path) -> None:
+    """Found at 2,000 claims: a claim labeled late from its first line's date of service
+    had a later line still inside its own window, and the rules lane rightly disagreed."""
+    from denial_desk.reference import payer_rules
+
+    claims = [c for f in sorted(generated.glob("*.837")) for c in parse_837p(f.read_text())]
+    remits = [parse_835(f.read_text()) for f in sorted(generated.glob("*.835"))]
+    denials, _ = join(claims, remits)
+    labels = {
+        r["line_control_number"]: r for r in map(json.loads, (generated / "labels.jsonl").open())
+    }
+    late = [d for d in denials if labels[d.line_control_number]["root_cause"] == "timely_filing"]
+    assert late
+    for d in late:
+        deadline = payer_rules()[d.payer.value].initial_deadline(d.submitted.service_date)
+        assert d.submission_date > deadline, d.line_control_number

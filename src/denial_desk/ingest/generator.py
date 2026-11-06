@@ -25,7 +25,7 @@ from denial_desk.domain.models import GroupCode, Payer
 from denial_desk.ingest.case_files import DeniedLineFacts, Expected, build_case_file
 from denial_desk.reference import payer_rules
 
-GENERATOR_VERSION = "0.4.0"  # 0.4: paid services; 0.3: visits match units; 0.2: case files
+GENERATOR_VERSION = "0.4.1"  # 0.4.1: late is late for every line; 0.4: paid services
 START_DATE = date(2026, 1, 5)  # fixed, never date.today(): determinism
 PROVIDER_NPI = "1234567893"
 PAYER_NAMES = {
@@ -257,7 +257,10 @@ def _plant_evidence(rng: random.Random, claim: _Claim, scenario: Scenario) -> li
         case "missing_prior_auth":
             claim.prior_auth = None
         case "timely_filing":
-            limit = payer_rules()[claim.payer.value].initial_deadline(claim.lines[0].service_date)
+            # Timely filing is judged per line, by each line's own date of service. Late must
+            # mean late for every line, so count from the claim's *last* service date.
+            last_dos = max(ln.service_date for ln in claim.lines)
+            limit = payer_rules()[claim.payer.value].initial_deadline(last_dos)
             claim.submission_date = limit + timedelta(days=rng.randint(1, 60))
         case "missing_rendering_npi":
             claim.rendering_npi = None

@@ -21,6 +21,17 @@
         {% if row.filing_deadline and not payer_rules.verified %}<span class="badge unverified">payer limit unverified</span>{% endif %}</dd>
     </dl>
     <p>{{ row.rationale }}</p>
+    {% if row.model_meta and row.model_meta.action %}
+    <dl>
+      <dt>Model</dt><dd>{{ row.model_meta.model }} · {{ row.model_meta.prompt }}</dd>
+      <dt>Model said</dt><dd>{{ row.model_meta.action|replace("_", " ") }} ({{ row.model_meta.root_cause|replace("_", " ") }}),
+        confidence {{ "%.2f"|format(row.model_meta.confidence) }}{% if row.lane == "human" %} — handed off{% endif %}</dd>
+      <dt>Relied on</dt><dd>{{ row.model_meta.evidence|join(", ") or "—" }}</dd>
+      <dt>Cost</dt><dd>${{ "%.4f"|format(row.model_meta.usd) }} (recorded run, replayed here)</dd>
+    </dl>
+    {% elif row.model_meta and row.model_meta.failure %}
+    <p class="muted">Model lane: {{ row.model_meta.failure|replace("_", " ") }} — a person decides.</p>
+    {% endif %}
     {% if row.citations %}<ul class="cites">{% for c in row.citations %}<li>{{ c }}</li>{% endfor %}</ul>{% endif %}
   </div>
 </div>
@@ -49,6 +60,35 @@
     </dl>
   </div>
 </div>
+
+{% if row.case_file %}{% set cf = row.case_file %}{% set cited = (row.model_meta.evidence if row.model_meta and row.model_meta.evidence else []) %}
+<div class="panel">
+  <h2>Case file</h2>
+  <div class="grid2">
+    <div>
+      <h3>Authorizations</h3>
+      {% for a in cf.authorizations %}<p {% if "authorizations[%d]"|format(loop.index0) in cited %}class="cited"{% endif %}>
+        <code>[{{ loop.index0 }}]</code> {{ a.auth_number }} · {{ a.procedure_code }} · {{ a.units }} units · {{ a.start }} → {{ a.end }}
+        {% if a.note %}<br><span class="muted">{{ a.note }}</span>{% endif %}</p>{% else %}<p class="muted">none</p>{% endfor %}
+      <h3>Eligibility</h3>
+      {% for e in cf.eligibility %}<p {% if "eligibility[%d]"|format(loop.index0) in cited %}class="cited"{% endif %}>
+        <code>[{{ loop.index0 }}]</code> {{ e.member_id }} · {{ e.start }} → {{ e.end or "open" }}
+        {% if e.note %}<br><span class="muted">{{ e.note }}</span>{% endif %}</p>{% endfor %}
+    </div>
+    <div>
+      <h3>Visits (EVV)</h3>
+      {% for v in cf.visits %}<p {% if "visits[%d]"|format(loop.index0) in cited %}class="cited"{% endif %}>
+        <code>[{{ loop.index0 }}]</code> {{ v.service_date }} {{ v.start[:5] }}–{{ v.end[:5] }} · {{ v.procedure_code }} · {{ v.caregiver_id }}</p>{% endfor %}
+      {% if cf.paid_services %}<h3>Already paid</h3>
+      {% for s in cf.paid_services %}<p {% if "paid_services[%d]"|format(loop.index0) in cited %}class="cited"{% endif %}>
+        <code>[{{ loop.index0 }}]</code> {{ s.service_date }} · {{ s.procedure_code }} · {{ s.units }} units · {{ s.payer_claim_control_number }}</p>{% endfor %}{% endif %}
+    </div>
+  </div>
+  <h3>Care note <span class="muted">· third-party text, shown to the model as untrusted data</span></h3>
+  <p class="untrusted {% if "care_note" in cited %}cited{% endif %}">{{ cf.care_note or "(no note)" }}</p>
+  {% if cited %}<p class="muted">Outlined items are the ones the model cited.</p>{% endif %}
+</div>
+{% endif %}
 
 <div class="panel">
   <h2>Review</h2>

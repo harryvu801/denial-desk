@@ -8,12 +8,14 @@
   :root {
     --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e2e2dc;
     --accent: #2457c5; --det: #1f7a4d; --det-bg: #e3f3ea; --hum: #9a5b00; --hum-bg: #fbefd9;
+    --mod: #6b3fb5; --mod-bg: #efe7fb;
     --bad: #b3261e; --bad-bg: #fbe4e2; color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #161615; --panel: #1f1f1d; --ink: #ecece8; --muted: #a2a29b; --line: #34342f;
       --accent: #7aa2ff; --det: #6fd19f; --det-bg: #183527; --hum: #f0b45c; --hum-bg: #3a2a12;
+      --mod: #c3a6ff; --mod-bg: #2c2140;
       --bad: #ff8a80; --bad-bg: #3d1a17; color-scheme: dark;
     }
   }
@@ -43,6 +45,10 @@
   .badge { display: inline-block; padding: .05rem .45rem; border-radius: 999px; font-size: .75rem; font-weight: 600; }
   .deterministic { color: var(--det); background: var(--det-bg); }
   .human { color: var(--hum); background: var(--hum-bg); }
+  .model { color: var(--mod); background: var(--mod-bg); }
+  .untrusted { border-left: 3px solid var(--hum); padding: .4rem .75rem; background: var(--hum-bg); border-radius: 4px; }
+  .cited { outline: 2px solid var(--mod); outline-offset: 1px; border-radius: 3px; }
+  h3 { font-size: .85rem; margin: .9rem 0 .35rem; color: var(--muted); font-weight: 600; }
   .unverified { color: var(--bad); background: var(--bad-bg); }
   .muted { color: var(--muted); }
   form.filters { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: .75rem; }

@@ -9,6 +9,7 @@ from datetime import date
 from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import Engine, create_engine, func, select
 from sqlalchemy.orm import Session, selectinload, sessionmaker
@@ -57,7 +58,14 @@ def record_remittance(session: Session, trace_number: str, payer: str, payment_d
     session.add(RemittanceRow(trace_number=trace_number, payer=payer, payment_date=payment_date))
 
 
-def save_denial(session: Session, record: DenialRecord, resolution: Resolution) -> bool:
+def save_denial(
+    session: Session,
+    record: DenialRecord,
+    resolution: Resolution,
+    *,
+    case_file: dict[str, Any] | None = None,
+    model_meta: dict[str, Any] | None = None,
+) -> bool:
     """Insert a denial and its proposal. Returns False (and writes nothing) if this
     (patient control number, line control number) already exists — re-ingest is a no-op."""
     exists = session.scalar(
@@ -85,6 +93,8 @@ def save_denial(session: Session, record: DenialRecord, resolution: Resolution) 
         rationale=resolution.rationale,
         citations=list(resolution.citations),
         filing_deadline=resolution.filing_deadline,
+        case_file=case_file,
+        model_meta=model_meta,
     )
     session.add(row)
     session.flush()  # assigns row.id
@@ -92,7 +102,7 @@ def save_denial(session: Session, record: DenialRecord, resolution: Resolution) 
         DecisionAudit(
             denial_id=row.id,
             event="proposed",
-            actor="system",
+            actor=f"model:{resolution.model_version}" if resolution.model_version else "system",
             lane=resolution.lane.value,
             path=resolution.path.value,
             rule_id=resolution.rule_id,
@@ -161,6 +171,7 @@ def recent_audit(session: Session, limit: int = 100) -> list[DecisionAudit]:
 class QueueStats:
     total: int
     deterministic: int
+    model: int
     pending: int
     dollars_at_risk: Decimal
 
@@ -177,6 +188,10 @@ def queue_stats(session: Session) -> QueueStats:
         )
         or 0
     )
+    model = (
+        session.scalar(select(func.count(DenialRow.id)).where(DenialRow.lane == Lane.MODEL.value))
+        or 0
+    )
     pending = (
         session.scalar(select(func.count(DenialRow.id)).where(DenialRow.status == "pending")) or 0
     )
@@ -185,4 +200,12 @@ def queue_stats(session: Session) -> QueueStats:
             DenialRow.status == "pending"
         )
     )
-    return QueueStats(total, deterministic, pending, Decimal(dollars or 0))
+    return QueueStats(total, deterministic, model, pending, Decimal(dollars or 0))
+
+
+def model_cost(session: Session) -> float:
+    """Recorded USD of every model-lane call behind the current queue (replayed, not spent)."""
+    metas: list[dict[str, Any] | None] = list(
+        session.scalars(select(DenialRow.model_meta).where(DenialRow.model_meta.is_not(None)))
+    )
+    return sum(float(m.get("usd", 0.0)) for m in metas if m)

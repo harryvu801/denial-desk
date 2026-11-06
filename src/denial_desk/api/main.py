@@ -29,6 +29,7 @@ from denial_desk.persistence.store import (
     get_denial,
     list_denials,
     make_engine,
+    model_cost,
     queue_stats,
     recent_audit,
     review,
@@ -79,6 +80,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
             {
                 "rows": rows,
                 "stats": queue_stats(session),
+                "model_cost": model_cost(session),
                 "filters": {"status": status, "lane": lane, "payer": payer},
                 "payers": [p.value for p in Payer],
             },

@@ -5,6 +5,8 @@
   <div class="stat"><div class="v">{{ stats.total }}</div><div class="k">denied lines ingested</div></div>
   <div class="stat"><div class="v">{{ "%.0f"|format(stats.deterministic_share * 100) }}%</div>
     <div class="k">resolved by rules, zero model spend</div></div>
+  <div class="stat"><div class="v">{{ stats.model }}</div>
+    <div class="k">proposed by the model (replayed, ${{ "%.4f"|format(model_cost) }} recorded)</div></div>
   <div class="stat"><div class="v">{{ stats.pending }}</div><div class="k">awaiting review</div></div>
   <div class="stat"><div class="v">{{ stats.dollars_at_risk|money }}</div><div class="k">pending dollars at risk</div></div>
 </div>
@@ -16,7 +18,7 @@
     {% endfor %}
   </select>
   <select name="lane">
-    {% for l in ["", "deterministic", "human"] %}
+    {% for l in ["", "deterministic", "model", "human"] %}
     <option value="{{ l }}" {% if filters.lane == l %}selected{% endif %}>{{ l or "any lane" }}</option>
     {% endfor %}
   </select>

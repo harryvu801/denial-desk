@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from denial_desk.agent.input import build_request
+from denial_desk.agent.lane import recording_path
 from denial_desk.agent.prompts import load_prompt
 from denial_desk.agent.proposer import (
     AnthropicProposer,
@@ -50,15 +51,11 @@ def usd(outcome: ProposalOutcome) -> float:
     return (outcome.usage.input_tokens * price_in + outcome.usage.output_tokens * price_out) / 1e6
 
 
-def recording_path(model: str, prompt_version: str) -> Path:
-    return Path(settings.recordings_dir) / f"classify-{prompt_version}-{model}.jsonl"
-
-
 SWEEP = (0.0, 0.5, 0.6, 0.7, 0.8, 0.9)
 
 
 def make_proposer(kind: str, model: str, record: bool, prompt_version: str) -> Proposer:
-    path = recording_path(model, prompt_version)
+    path = recording_path(settings, model, prompt_version)
     if kind == "replay":
         return ReplayProposer(path, model)
     if kind == "stub":

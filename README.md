@@ -1,7 +1,7 @@
 # Denial Desk
 
-> **Status: rules lane, human review queue and audit log working; model lane evaluated, not
-> yet wired into the queue.** **Synthetic data only. No PHI enters this system.**
+> **Status: working end to end — rules lane, model lane (replayed, no API key needed),
+> human review queue, append-only audit log.** **Synthetic data only. No PHI enters this system.**
 
 Denial Desk reads Medicaid claim denials from X12 837P/835 files, works out what the payer
 refused and why, and proposes the next action: corrected claim, appeal, write-off, or "a human
@@ -10,13 +10,13 @@ payer.
 
 ## Results so far
 
-**Rules lane** — default synthetic run (`make demo`: seed 42, 500 claims, 334 denied lines):
+**Rules lane** — the demo run (`make demo`: seed 42, 2,000 claims, 1,269 denied lines):
 
 | | |
 |---|---|
-| Denials proposed by rules, **zero model spend** | **86%** (288 of 334) |
-| Rules-lane proposals matching the generator's ground truth | 100% (288 of 288) |
-| Left for judgment | 14%: medical necessity, bundling, units over authorization, coverage ended, unexplained CARC 16 |
+| Denials proposed by rules, **zero model spend** | **86%** (1,086 of 1,269) |
+| Rules-lane proposals matching the generator's ground truth | 100% (1,086 of 1,086) |
+| Left for judgment → model lane | 14% (183): 77 get a model proposal, 106 go to a person |
 
 **Model lane** — the denials the rules leave behind (183 cases from 2,000 claims), each with
 a case file of authorizations, eligibility, visit records and a care note.
@@ -56,12 +56,15 @@ replayed (`make eval-accuracy`).
 
 ## What it looks like
 
-`make demo` generates the data, ingests it and serves the review queue at
-http://localhost:8000. The queue is sorted by dollars at risk. Each denial shows the CARC
-and RARC definitions as of the adjudication date, the line as billed next to the line as
-adjudicated, the proposed action with its citations and computed filing deadline, and three
-buttons: approve, override, or reject. Every decision is appended to an audit log that the
-database refuses to update or delete.
+`make demo` generates the data, ingests it — rules first, then the model for what the rules
+leave, replayed from committed recordings — and serves the review queue at
+http://localhost:8000. The queue is sorted by dollars at risk and filterable by lane. Each
+denial shows the CARC and RARC definitions as of the adjudication date, the line as billed
+next to the line as adjudicated, and the proposal: a cited rule, or the model's action,
+confidence and the case-file items it relied on (outlined in the case file below it, with
+the care note marked as untrusted third-party text). Filing deadlines are always computed
+in code. A reviewer approves, overrides or rejects; every decision is appended to an audit
+log the database refuses to update or delete.
 
 ![Review queue sorted by dollars at risk, with rules-lane and human-lane proposals](docs/screenshots/review-queue.png)
 

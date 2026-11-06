@@ -37,27 +37,39 @@ def _working_date(directory: Path, as_of: str | None) -> date | None:
 @app.command()
 def ingest(directory: Path | None = None, as_of: str | None = None) -> None:
     """Parse, join, triage and store every 837P/835 file in a directory. Idempotent."""
+    from denial_desk.agent.lane import build_model_lane
     from denial_desk.ingest.pipeline import ingest_directory
     from denial_desk.persistence.store import make_engine, session_scope
 
     directory = directory or Path(settings.synthetic_data_dir)
     working_date = _working_date(directory, as_of)
+    lane = build_model_lane(settings)
     with session_scope(make_engine(settings.database_url)) as session:
-        s = ingest_directory(session, directory, as_of=working_date)
+        s = ingest_directory(session, directory, as_of=working_date, model_lane=lane)
     share = s.deterministic / s.denials_new if s.denials_new else 0.0
     typer.echo(
         f"working date: {working_date or 'each remittance date (replay)'}\n"
         f"837 files: {s.files_837}  835 files: {s.files_835}"
         f" (already ingested: {s.remittances_skipped})\n"
         f"new denials: {s.denials_new}  existing: {s.denials_existing}"
-        f"  rules lane: {s.deterministic} ({share:.0%})  join issues: {len(s.issues)}"
+        f"  rules lane: {s.deterministic} ({share:.0%})  join issues: {len(s.issues)}\n"
+        f"model lane ({settings.model_lane}, {settings.model_resolution},"
+        f" prompt {settings.classify_prompt_version}): {s.model} proposals,"
+        f" {s.model_failures} failures"
     )
 
 
 @app.command()
-def demo(claims: int = 500, seed: int = 42) -> None:
-    """Generate synthetic data and ingest it, ready for `make serve`."""
-    generate(claims=claims, seed=seed, out=None)
+def demo() -> None:
+    """Rebuild the demo database from scratch: generate, ingest, ready for `make serve`.
+
+    Uses the eval set's seed and size, so the denials the rules hand to a human are exactly
+    the ones with committed model recordings, replayed with no API key."""
+    from denial_desk.persistence.models import Base
+    from denial_desk.persistence.store import make_engine
+
+    Base.metadata.drop_all(make_engine(settings.database_url))
+    generate(claims=settings.demo_claims, seed=settings.demo_seed, out=None)
     ingest(directory=None, as_of=None)
 
 

@@ -246,3 +246,6 @@ class Resolution(BaseModel, frozen=True):
         default=None,
         description="Computed in Python, never by a model. See ADR-010.",
     )
+    # Provenance for audit and eval reproducibility (ADR-017). Set on model-lane proposals.
+    prompt_version: str | None = None
+    model_version: str | None = None

@@ -71,6 +71,11 @@ class DenialRow(Base):
     rationale: Mapped[str] = mapped_column(Text)
     citations: Mapped[list[str]] = mapped_column(JSON)
     filing_deadline: Mapped[date | None]
+    # The evidence a reviewer needs (ADR-029) and, for human-lane denials, what the model
+    # proposed: model, prompt, confidence, evidence paths, rationale, recorded cost.
+    # none_as_null: store Python None as SQL NULL, not JSON 'null', so IS NULL queries work.
+    case_file: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
+    model_meta: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
 
     # The human decision — the only mutable part, and every change is also audited.
     status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
