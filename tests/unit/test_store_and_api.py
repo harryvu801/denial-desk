@@ -51,8 +51,12 @@ def test_review_flow(tmp_path: Path) -> None:
     # Denial 1 (CARC 4, modifier) is a rules-lane proposal; approving records the decision.
     resp = client.post("/denials/1/review", data={"action": "approve"}, follow_redirects=False)
     assert resp.status_code == 303
+    assert "done=PCN-A-2" in resp.headers["location"]
+    landed = client.get(resp.headers["location"]).text
+    assert "Approved PCN-A-2." in landed  # confirmation on the next page
     detail = client.get("/denials/1").text
-    assert "approved" in detail and "corrected claim" in detail
+    assert "Approved" in detail and "Corrected claim" in detail
+    assert "corrected_claim" not in detail  # stored values never reach the screen
 
     # Overriding to NEEDS_HUMAN is not a decision.
     bad = client.post(
@@ -60,3 +64,48 @@ def test_review_flow(tmp_path: Path) -> None:
     )
     assert bad.status_code == 422
     assert client.get("/audit").status_code == 200
+
+
+def test_queue_search_sort_and_labels(tmp_path: Path) -> None:
+    url = f"sqlite:///{tmp_path / 'q.db'}"
+    with session_scope(make_engine(url)) as s:
+        ingest_directory(s, FIXTURES, as_of=AS_OF)
+    client = TestClient(create_app(url))
+
+    # Search covers claim, procedure, CARC and RARC.
+    for term, hit, miss in [
+        ("A-2", "PCN-A-2", "PCN-B-1"),
+        ("m51", "PCN-A-2", "PCN-B-1"),
+        ("MA130", "PCN-B-1", "PCN-A-2"),
+        ("S5130", "PCN-A-2", "PCN-B-1"),
+    ]:
+        page = client.get("/", params={"q": term}).text
+        assert hit in page and miss not in page, term
+    assert "No denials match" in client.get("/", params={"q": "zzz"}).text
+
+    # Every column header is a sort link; sorting reorders rows.
+    page = client.get("/").text
+    for key in (
+        "payer",
+        "claim",
+        "proc",
+        "carc",
+        "rarc",
+        "denied",
+        "lane",
+        "proposal",
+        "rule",
+        "deadline",
+        "status",
+    ):
+        assert f"sort={key}" in page, key
+    asc = client.get("/", params={"sort": "claim", "order": "asc"}).text
+    desc = client.get("/", params={"sort": "claim", "order": "desc"}).text
+    assert asc.index("PCN-A-2") < asc.index("PCN-B-1")
+    assert desc.index("PCN-B-1") < desc.index("PCN-A-2")
+    assert client.get("/", params={"sort": "nonsense"}).status_code == 200  # whitelist
+
+    # Labels and tooltips.
+    assert ">Rules</span>" in page and "deterministic</span>" not in page
+    assert 'title="Claim Adjustment Reason Code' in page
+    assert "Showing 1\u20132 of 2" in page  # en dash

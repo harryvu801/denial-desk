@@ -14,6 +14,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlencode, urlparse
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -25,6 +26,7 @@ from denial_desk.config import settings
 from denial_desk.domain.models import Payer, ResolutionPath
 from denial_desk.persistence.models import DenialRow
 from denial_desk.persistence.store import (
+    SORT_COLUMNS,
     ReviewAction,
     get_denial,
     list_denials,
@@ -42,6 +44,65 @@ TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 # the item waits in the queue.
 TEMPLATES.env.globals["today"] = date.today
 TEMPLATES.env.filters["money"] = lambda v: f"${Decimal(v):,.2f}"
+TEMPLATES.env.filters["num"] = lambda v: f"{v:,}"
+
+# Display names for stored values. Stored values stay machine-friendly (snake_case, ADR
+# vocabulary); the screen shows sentence-case labels. One place, so no template ever
+# prints `corrected_claim`.
+LABELS = {
+    "deterministic": "Rules",
+    "model": "Model",
+    "human": "Human",
+    "corrected_claim": "Corrected claim",
+    "write_off": "Write-off",
+    "no_action": "No action",
+    "needs_human": "Needs human",
+}
+ABBREVIATIONS = {
+    "CARC": "Claim Adjustment Reason Code: the payer's standard reason for not paying",
+    "RARC": "Remittance Advice Remark Code: extra detail on the reason",
+    "Proc": "Procedure code (HCPCS/CPT) as billed",
+    "ICN": "Internal Control Number: the payer's own claim number",
+    "EVV": "Electronic Visit Verification: the caregiver's recorded check-in and check-out",
+    "PCN": "Patient Control Number: the provider's claim number (CLM01)",
+}
+
+
+def label(value: object) -> str:
+    """`corrected_claim` -> `Corrected claim`; known terms map to their display name."""
+    if value is None or value == "":
+        return "—"
+    text = str(value)
+    return LABELS.get(text) or text.replace("_", " ")[:1].upper() + text.replace("_", " ")[1:]
+
+
+TEMPLATES.env.filters["label"] = label
+
+
+def actor(value: str) -> str:
+    """`system` -> `Rules engine`, `model:claude-sonnet-5-5` -> `Model (claude-sonnet-5-5)`."""
+    if value == "system":
+        return "Rules engine"
+    if value.startswith("model:"):
+        return f"Model ({value.removeprefix('model:')})"
+    return value[:1].upper() + value[1:]
+
+
+TEMPLATES.env.filters["actor"] = actor
+TEMPLATES.env.globals["abbr"] = ABBREVIATIONS
+TEMPLATES.env.globals["carc_desc"] = lambda code, as_of: carc_table().describe(code, as_of)
+TEMPLATES.env.globals["rarc_desc"] = lambda code, as_of: rarc_table().describe(code, as_of)
+
+PAGE_SIZE = 50
+FLASH_VERBS = {"approve": "Approved", "override": "Overrode", "reject": "Rejected the proposal for"}
+
+
+def flash_message(done: str, outcome: str, *, next_item: bool) -> str | None:
+    """Confirmation after a review, shown on the page the reviewer lands on."""
+    if not done or outcome not in FLASH_VERBS:
+        return None
+    tail = " Next pending denial below." if next_item else " The queue is clear."
+    return f"{FLASH_VERBS[outcome]} {done}.{tail}"
 
 
 def get_session(request: Request) -> Iterator[Session]:
@@ -72,22 +133,54 @@ def create_app(database_url: str | None = None) -> FastAPI:
         status: str = "pending",
         lane: str = "",
         payer: str = "",
+        q: str = "",
+        sort: str = "denied",
+        order: str = "desc",
+        page: int = 1,
+        done: str = "",
+        outcome: str = "",
     ) -> HTMLResponse:
-        rows = list_denials(session, status=status or None, lane=lane or None, payer=payer or None)
+        sort = sort if sort in SORT_COLUMNS else "denied"
+        page = max(page, 1)
+        result = list_denials(
+            session,
+            status=status or None,
+            lane=lane or None,
+            payer=payer or None,
+            search=q,
+            sort=sort,
+            descending=order != "asc",
+            limit=PAGE_SIZE,
+            offset=(page - 1) * PAGE_SIZE,
+        )
+        filters = {"status": status, "lane": lane, "payer": payer, "q": q}
         return TEMPLATES.TemplateResponse(
             request,
             "queue.html",
             {
-                "rows": rows,
+                "active": "queue",
+                "flash": flash_message(done, outcome, next_item=False),
+                "rows": result.rows,
+                "total": result.total,
+                "page": page,
+                "pages": max(1, -(-result.total // PAGE_SIZE)),
+                "page_size": PAGE_SIZE,
                 "stats": queue_stats(session),
                 "model_cost": model_cost(session),
-                "filters": {"status": status, "lane": lane, "payer": payer},
+                "filters": filters,
+                "sort": sort,
+                "order": "asc" if order == "asc" else "desc",
+                # Query string for links that change one thing and keep the rest.
+                "base_query": urlencode(filters),
+                "filtered": bool(lane or payer or q or status != "pending"),
                 "payers": [p.value for p in Payer],
             },
         )
 
     @app.get("/denials/{denial_id}", response_class=HTMLResponse)
-    def detail(request: Request, denial_id: int, session: SessionDep) -> HTMLResponse:
+    def detail(
+        request: Request, denial_id: int, session: SessionDep, done: str = "", outcome: str = ""
+    ) -> HTMLResponse:
         row = get_denial(session, denial_id)
         if row is None:
             raise HTTPException(404, "denial not found")
@@ -108,6 +201,9 @@ def create_app(database_url: str | None = None) -> FastAPI:
                 "rarcs": remarks,
                 "payer_rules": payer_rules()[row.payer],
                 "paths": [p for p in ResolutionPath if p is not ResolutionPath.NEEDS_HUMAN],
+                "active": "queue",
+                "back": _queue_url(request),
+                "flash": flash_message(done, outcome, next_item=True),
             },
         )
 
@@ -133,16 +229,28 @@ def create_app(database_url: str | None = None) -> FastAPI:
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
         session.flush()
+        row = session.get(DenialRow, denial_id)
+        flash = urlencode({"done": row.line_control_number if row else "", "outcome": action.value})
         next_id = session.scalar(
             select(DenialRow.id)
             .where(DenialRow.status == "pending")
             .order_by(DenialRow.denied_amount.desc(), DenialRow.id)
             .limit(1)
         )
-        return RedirectResponse(f"/denials/{next_id}" if next_id else "/", status_code=303)
+        target = f"/denials/{next_id}?{flash}" if next_id else f"/?{flash}"
+        return RedirectResponse(target, status_code=303)
 
     @app.get("/audit", response_class=HTMLResponse)
     def audit(request: Request, session: SessionDep) -> HTMLResponse:
-        return TEMPLATES.TemplateResponse(request, "audit.html", {"events": recent_audit(session)})
+        return TEMPLATES.TemplateResponse(
+            request, "audit.html", {"events": recent_audit(session), "active": "audit"}
+        )
 
     return app
+
+
+def _queue_url(request: Request) -> str:
+    """Back to the queue the reviewer came from, filters and sort intact, if we know it."""
+    referer = urlparse(request.headers.get("referer", ""))
+    same_host = referer.netloc in ("", request.url.netloc)
+    return f"/?{referer.query}" if same_host and referer.path == "/" and referer.query else "/"

@@ -1,36 +1,37 @@
 {% extends "base.html" %}
 {% block title %}{{ row.line_control_number }} · Denial Desk{% endblock %}
 {% block content %}
+<a class="back" href="{{ back }}">← Review queue</a>
 <h1>{{ row.line_control_number }} <span class="muted">· {{ payer_rules.name }} · {{ row.denied_amount|money }} denied</span></h1>
 
 <div class="grid2">
   <div class="panel">
     <h2>Why the payer denied it</h2>
-    {% for code, desc in carcs %}<p><strong>CARC {{ code }}</strong> — {{ desc }}</p>{% endfor %}
-    {% for code, desc in rarcs %}<p><strong>RARC {{ code }}</strong> — {{ desc }}</p>{% endfor %}
+    {% for code, desc in carcs %}<p><strong><abbr title="{{ abbr.CARC }}">CARC</abbr> {{ code }}</strong> — {{ desc }}</p>{% endfor %}
+    {% for code, desc in rarcs %}<p><strong><abbr title="{{ abbr.RARC }}">RARC</abbr> {{ code }}</strong> — {{ desc }}</p>{% endfor %}
     <p class="muted">Code definitions resolved as of the adjudication date, {{ row.adjudication_date }}.</p>
   </div>
 
   <div class="panel">
-    <h2>Proposal <span class="badge {{ row.lane }}">{{ row.lane }}</span></h2>
+    <h2>Proposal <span class="badge {{ row.lane }}">{{ row.lane|label }} lane</span></h2>
     <dl>
-      <dt>Action</dt><dd><strong>{{ row.proposed_path|replace("_", " ") }}</strong></dd>
-      <dt>Rule</dt><dd>{{ row.rule_id or "none matched" }}</dd>
+      <dt>Action</dt><dd><strong>{{ row.proposed_path|label }}</strong></dd>
+      <dt>Rule</dt><dd>{% if row.rule_id %}<code>{{ row.rule_id }}</code>{% elif row.lane == "model" %}No rule applies; proposed by the model{% else %}No rule applies{% endif %}</dd>
       <dt>Deadline</dt><dd>{{ row.filing_deadline or "—" }}
-        {% if row.status == "pending" and row.filing_deadline and row.filing_deadline < today() %}<span class="badge unverified">expired</span> {% endif %}
-        {% if row.filing_deadline and not payer_rules.verified %}<span class="badge unverified">payer limit unverified</span>{% endif %}</dd>
+        {% if row.status == "pending" and row.filing_deadline and row.filing_deadline < today() %}<span class="badge unverified">Expired</span> {% endif %}
+        {% if row.filing_deadline and not payer_rules.verified %}<span class="badge unverified">Payer limit unverified</span>{% endif %}</dd>
     </dl>
     <p>{{ row.rationale }}</p>
     {% if row.model_meta and row.model_meta.action %}
     <dl>
       <dt>Model</dt><dd>{{ row.model_meta.model }} · {{ row.model_meta.prompt }}</dd>
-      <dt>Model said</dt><dd>{{ row.model_meta.action|replace("_", " ") }} ({{ row.model_meta.root_cause|replace("_", " ") }}),
+      <dt>Model said</dt><dd>{{ row.model_meta.action|label }} ({{ row.model_meta.root_cause|label|lower }}),
         confidence {{ "%.2f"|format(row.model_meta.confidence) }}{% if row.lane == "human" %} — handed off{% endif %}</dd>
       <dt>Relied on</dt><dd>{{ row.model_meta.evidence|join(", ") or "—" }}</dd>
       <dt>Cost</dt><dd>${{ "%.4f"|format(row.model_meta.usd) }} (recorded run, replayed here)</dd>
     </dl>
     {% elif row.model_meta and row.model_meta.failure %}
-    <p class="muted">Model lane: {{ row.model_meta.failure|replace("_", " ") }} — a person decides.</p>
+    <p class="muted">Model lane: {{ row.model_meta.failure|label|lower }}. A person decides.</p>
     {% endif %}
     {% if row.citations %}<ul class="cites">{% for c in row.citations %}<li>{{ c }}</li>{% endfor %}</ul>{% endif %}
   </div>
@@ -40,21 +41,21 @@
   <div class="panel">
     <h2>As submitted (837P)</h2>
     <dl>
-      <dt>Patient control #</dt><dd>{{ rec.patient_control_number }}</dd>
+      <dt><abbr title="{{ abbr.PCN }}">Patient control #</abbr></dt><dd>{{ rec.patient_control_number }}</dd>
       <dt>Procedure</dt><dd>{{ rec.submitted.procedure_code }} {{ rec.submitted.modifiers|join(" ") }}</dd>
       <dt>Units</dt><dd>{{ rec.submitted.units }}</dd>
       <dt>Charge</dt><dd>{{ rec.submitted.charge|money }}</dd>
       <dt>Date of service</dt><dd>{{ rec.submitted.service_date }}</dd>
       <dt>Submitted</dt><dd>{{ rec.submission_date }}</dd>
-      <dt>Prior auth</dt><dd>{{ rec.prior_auth_number or "none on claim" }}</dd>
+      <dt>Prior authorization</dt><dd>{{ rec.prior_auth_number or "None on claim" }}</dd>
     </dl>
   </div>
   <div class="panel">
     <h2>As adjudicated (835)</h2>
     <dl>
-      <dt>Payer ICN</dt><dd>{{ rec.payer_claim_control_number }}</dd>
+      <dt>Payer <abbr title="{{ abbr.ICN }}">ICN</abbr></dt><dd>{{ rec.payer_claim_control_number }}</dd>
       <dt>Procedure</dt><dd>{{ rec.adjudicated.procedure_code }} {{ rec.adjudicated.modifiers|join(" ") }}</dd>
-      <dt>Charge / paid</dt><dd>{{ rec.adjudicated.charge|money }} / {{ rec.adjudicated.paid|money }}</dd>
+      <dt>Charge / Paid</dt><dd>{{ rec.adjudicated.charge|money }} / {{ rec.adjudicated.paid|money }}</dd>
       <dt>Adjustments</dt><dd>{% for a in rec.adjudicated.adjustments %}{{ a.group_code }}-{{ a.reason_code }} {{ a.amount|money }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
       <dt>Adjudicated</dt><dd>{{ rec.adjudication_date }}</dd>
     </dl>
@@ -72,11 +73,11 @@
         {% if a.note %}<br><span class="muted">{{ a.note }}</span>{% endif %}</p>{% else %}<p class="muted">none</p>{% endfor %}
       <h3>Eligibility</h3>
       {% for e in cf.eligibility %}<p {% if "eligibility[%d]"|format(loop.index0) in cited %}class="cited"{% endif %}>
-        <code>[{{ loop.index0 }}]</code> {{ e.member_id }} · {{ e.start }} → {{ e.end or "open" }}
+        <code>[{{ loop.index0 }}]</code> {{ e.member_id }} · {{ e.start }} → {{ e.end or "Open" }}
         {% if e.note %}<br><span class="muted">{{ e.note }}</span>{% endif %}</p>{% endfor %}
     </div>
     <div>
-      <h3>Visits (EVV)</h3>
+      <h3>Visits (<abbr title="{{ abbr.EVV }}">EVV</abbr>)</h3>
       {% for v in cf.visits %}<p {% if "visits[%d]"|format(loop.index0) in cited %}class="cited"{% endif %}>
         <code>[{{ loop.index0 }}]</code> {{ v.service_date }} {{ v.start[:5] }}–{{ v.end[:5] }} · {{ v.procedure_code }} · {{ v.caregiver_id }}</p>{% endfor %}
       {% if cf.paid_services %}<h3>Already paid</h3>
@@ -85,7 +86,7 @@
     </div>
   </div>
   <h3>Care note <span class="muted">· third-party text, shown to the model as untrusted data</span></h3>
-  <p class="untrusted {% if "care_note" in cited %}cited{% endif %}">{{ cf.care_note or "(no note)" }}</p>
+  <p class="untrusted {% if "care_note" in cited %}cited{% endif %}">{{ cf.care_note or "(No note)" }}</p>
   {% if cited %}<p class="muted">Outlined items are the ones the model cited.</p>{% endif %}
 </div>
 {% endif %}
@@ -97,17 +98,23 @@
     <textarea name="note" rows="2" style="width:100%" placeholder="Note for the audit log (optional)"></textarea>
     <div class="actions">
       {% if row.proposed_path != "needs_human" %}
-      <button class="primary" name="action" value="approve">Approve: {{ row.proposed_path|replace("_", " ") }}</button>
+      <button class="primary" name="action" value="approve">Approve: {{ row.proposed_path|label }}</button>
+      <span class="muted">or</span>
       {% endif %}
-      <select name="override_path">
-        {% for p in paths %}<option value="{{ p.value }}">{{ p.value|replace("_", " ") }}</option>{% endfor %}
-      </select>
-      <button name="action" value="override">{{ "Decide" if row.proposed_path == "needs_human" else "Override" }}</button>
-      <button class="danger" name="action" value="reject">Reject proposal</button>
+      <label><span class="visually-hidden">Choose a different action</span>
+      <select name="override_path" id="override-path"
+              onchange="document.getElementById('override-btn').disabled = !this.value">
+        <option value="">{{ "Choose an action…" if row.proposed_path == "needs_human" else "Choose a different action…" }}</option>
+        {% for p in paths %}{% if p.value != row.proposed_path %}<option value="{{ p.value }}">{{ p.value|label }}</option>{% endif %}{% endfor %}
+      </select></label>
+      <button id="override-btn" name="action" value="override" disabled
+              {% if row.proposed_path == "needs_human" %}class="primary"{% endif %}>{{ "Decide" if row.proposed_path == "needs_human" else "Override" }}</button>
+      <button class="danger" name="action" value="reject"
+              onclick="return confirm('Reject this proposal? The decision is permanent in the audit log.')">Reject proposal</button>
     </div>
   </form>
   {% else %}
-  <p>{{ row.status }}{% if row.final_path %} → <strong>{{ row.final_path|replace("_", " ") }}</strong>{% endif %}</p>
+  <p><span class="status {{ row.status }}">{{ row.status|label }}</span>{% if row.final_path %} → <strong>{{ row.final_path|label }}</strong>{% endif %}</p>
   {% endif %}
 </div>
 
@@ -117,8 +124,8 @@
     <thead><tr><th>When (UTC)</th><th>Event</th><th>Actor</th><th>Path</th><th>Note</th></tr></thead>
     <tbody>
     {% for e in row.audit %}
-    <tr><td>{{ e.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td><td>{{ e.event }}</td><td>{{ e.actor }}</td>
-        <td>{{ (e.path or "—")|replace("_", " ") }}</td><td class="muted" style="white-space:normal">{{ e.note }}</td></tr>
+    <tr><td>{{ e.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td><td>{{ e.event|label }}</td><td>{{ e.actor|actor }}</td>
+        <td>{{ e.path|label }}</td><td class="muted" style="white-space:normal">{{ e.note }}</td></tr>
     {% endfor %}
     </tbody>
   </table>

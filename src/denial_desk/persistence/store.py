@@ -11,7 +11,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Engine, create_engine, func, select
+from sqlalchemy import Engine, create_engine, func, or_, select
 from sqlalchemy.orm import Session, selectinload, sessionmaker
 
 from denial_desk.domain.models import DenialRecord, Lane, Resolution, ResolutionPath
@@ -142,17 +142,74 @@ def review(
     return row
 
 
+# Sortable columns by the key the UI uses. A whitelist, so a query string can never name an
+# arbitrary column.
+SORT_COLUMNS = {
+    "payer": DenialRow.payer,
+    "claim": DenialRow.line_control_number,
+    "proc": DenialRow.procedure_code,
+    "carc": DenialRow.primary_carc,
+    "rarc": DenialRow.remark_codes,
+    "denied": DenialRow.denied_amount,
+    "lane": DenialRow.lane,
+    "proposal": DenialRow.proposed_path,
+    "rule": DenialRow.rule_id,
+    "deadline": DenialRow.filing_deadline,
+    "status": DenialRow.status,
+}
+
+
+@dataclass(frozen=True)
+class Page:
+    rows: list[DenialRow]
+    total: int
+
+
 def list_denials(
-    session: Session, status: str | None = None, lane: str | None = None, payer: str | None = None
-) -> list[DenialRow]:
-    stmt = select(DenialRow).order_by(DenialRow.denied_amount.desc(), DenialRow.id)
+    session: Session,
+    status: str | None = None,
+    lane: str | None = None,
+    payer: str | None = None,
+    *,
+    search: str | None = None,
+    sort: str = "denied",
+    descending: bool = True,
+    limit: int | None = None,
+    offset: int = 0,
+) -> Page:
+    """Filter, search, sort and page the queue. Search matches the claim/line number, the
+    procedure code, the CARC and the RARCs, case-insensitively."""
+    conditions = []
     if status:
-        stmt = stmt.where(DenialRow.status == status)
+        conditions.append(DenialRow.status == status)
     if lane:
-        stmt = stmt.where(DenialRow.lane == lane)
+        conditions.append(DenialRow.lane == lane)
     if payer:
-        stmt = stmt.where(DenialRow.payer == payer)
-    return list(session.scalars(stmt))
+        conditions.append(DenialRow.payer == payer)
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        conditions.append(
+            or_(
+                DenialRow.line_control_number.ilike(term),
+                DenialRow.patient_control_number.ilike(term),
+                DenialRow.procedure_code.ilike(term),
+                DenialRow.primary_carc.ilike(term),
+                DenialRow.remark_codes.ilike(term),
+            )
+        )
+    column = SORT_COLUMNS.get(sort, DenialRow.denied_amount)
+    order = column.desc() if descending else column.asc()
+    # Nulls (no rule, no deadline) sort last either way; id breaks ties so paging is stable.
+    stmt = (
+        select(DenialRow)
+        .where(*conditions)
+        .order_by(column.is_(None), order, DenialRow.id)
+        .offset(offset)
+    )
+    if limit is not None:
+        stmt = stmt.limit(limit)
+    total = session.scalar(select(func.count(DenialRow.id)).where(*conditions)) or 0
+    return Page(list(session.scalars(stmt)), total)
 
 
 def get_denial(session: Session, denial_id: int) -> DenialRow | None:
@@ -163,7 +220,12 @@ def get_denial(session: Session, denial_id: int) -> DenialRow | None:
 
 def recent_audit(session: Session, limit: int = 100) -> list[DecisionAudit]:
     return list(
-        session.scalars(select(DecisionAudit).order_by(DecisionAudit.id.desc()).limit(limit))
+        session.scalars(
+            select(DecisionAudit)
+            .options(selectinload(DecisionAudit.denial))  # one query, not one per row
+            .order_by(DecisionAudit.id.desc())
+            .limit(limit)
+        )
     )
 
 

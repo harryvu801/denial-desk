@@ -63,14 +63,48 @@
   h1 { font-size: 1.25rem; margin: 0 0 .75rem; } h2 { font-size: 1rem; margin: 0 0 .6rem; }
   ul.cites { margin: .25rem 0 0; padding-left: 1.1rem; color: var(--muted); font-size: .85rem; }
   .actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-top: .75rem; }
+  .stat .sub { color: var(--muted); font-size: .72rem; margin-top: .15rem; }
+  header nav a { color: var(--muted); padding-bottom: .2rem; }
+  header nav a[aria-current="page"] { color: var(--ink); font-weight: 600;
+    border-bottom: 2px solid var(--accent); text-decoration: none; }
+  abbr[title] { text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; }
+  th a.sort { color: inherit; display: inline-flex; gap: .25rem; align-items: center; }
+  th a.sort:hover { color: var(--ink); text-decoration: none; }
+  th a.sort.on { color: var(--ink); font-weight: 600; }
+  th a.sort .arrow { font-size: .65rem; opacity: .45; }
+  th a.sort.on .arrow { opacity: 1; }
+  .search input { min-width: 21rem; }
+  /* Code cells keep their tooltip but drop the underline: headers say what is hoverable. */
+  td abbr[title] { text-decoration: none; }
+  .clear { font-size: .85rem; }
+  .status { font-weight: 500; }
+  .status.approved { color: var(--det); } .status.rejected { color: var(--bad); }
+  .status.overridden { color: var(--mod); }
+  .pager { display: flex; gap: 1rem; align-items: center; justify-content: flex-end; margin: -.25rem 0 1rem; }
+  .flash { background: var(--det-bg); color: var(--det); border-radius: 8px; padding: .6rem 1rem;
+           margin-bottom: 1rem; font-weight: 500; }
+  .back { display: inline-block; margin-bottom: .5rem; font-size: .85rem; }
+  td.empty { padding: 1.5rem .6rem; white-space: normal; }
+  code { font-size: .85em; }
+  td code { color: var(--muted); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden;
+                     clip: rect(0 0 0 0); white-space: nowrap; }
 </style>
 </head>
 <body>
 <header>
   <strong><a href="/">Denial Desk</a></strong>
-  <nav><a href="/">Review queue</a><a href="/audit">Audit log</a></nav>
-  <span class="banner">Synthetic data only &middot; nothing is ever submitted to a payer</span>
+  <nav aria-label="Main">
+    <a href="/" {% if active == "queue" %}aria-current="page"{% endif %}>Review queue</a>
+    <a href="/audit" {% if active == "audit" %}aria-current="page"{% endif %}>Audit log</a>
+  </nav>
+  <span class="banner">Synthetic data only &middot; Nothing is ever submitted to a payer</span>
 </header>
-<main>{% block content %}{% endblock %}</main>
+<main>
+{% if flash %}<div class="flash" role="status">{{ flash }}</div>{% endif %}
+{% block content %}{% endblock %}
+</main>
 </body>
 </html>

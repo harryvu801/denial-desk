@@ -1,40 +1,72 @@
 {% extends "base.html" %}
 {% block title %}Review queue · Denial Desk{% endblock %}
 {% block content %}
+{% macro th(key, text, cls="", tip="") -%}
+  {%- set is_sorted = sort == key -%}
+  {%- set next_order = "asc" if is_sorted and order == "desc" else "desc" -%}
+  <th class="{{ cls }}" {% if is_sorted %}aria-sort="{{ 'descending' if order == 'desc' else 'ascending' }}"{% endif %}>
+    <a class="sort {% if is_sorted %}on{% endif %}" href="/?{{ base_query }}&sort={{ key }}&order={{ next_order }}">
+      {%- if tip %}<abbr title="{{ tip }}">{{ text }}</abbr>{% else %}{{ text }}{% endif -%}
+      <span class="arrow" aria-hidden="true">{% if is_sorted %}{{ "▼" if order == "desc" else "▲" }}{% else %}↕{% endif %}</span>
+    </a>
+  </th>
+{%- endmacro %}
+
 <div class="stats">
-  <div class="stat"><div class="v">{{ stats.total }}</div><div class="k">denied lines ingested</div></div>
+  <div class="stat"><div class="v">{{ stats.total|num }}</div><div class="k">Denied lines ingested</div></div>
   <div class="stat"><div class="v">{{ "%.0f"|format(stats.deterministic_share * 100) }}%</div>
-    <div class="k">resolved by rules, zero model spend</div></div>
-  <div class="stat"><div class="v">{{ stats.model }}</div>
-    <div class="k">proposed by the model (replayed, ${{ "%.4f"|format(model_cost) }} recorded)</div></div>
-  <div class="stat"><div class="v">{{ stats.pending }}</div><div class="k">awaiting review</div></div>
-  <div class="stat"><div class="v">{{ stats.dollars_at_risk|money }}</div><div class="k">pending dollars at risk</div></div>
+    <div class="k">Proposed by rules, with zero model spend</div></div>
+  <div class="stat"><div class="v">{{ stats.model|num }}</div>
+    <div class="k">Proposed by the model</div>
+    <div class="sub">Replayed from recordings · ${{ "%.2f"|format(model_cost) }} recorded cost</div></div>
+  <div class="stat"><div class="v">{{ stats.pending|num }}</div><div class="k">Awaiting review</div></div>
+  <div class="stat"><div class="v">{{ stats.dollars_at_risk|money }}</div><div class="k">Pending dollars at risk</div></div>
 </div>
 
-<form class="filters" method="get">
-  <select name="status">
+<form class="filters" method="get" role="search">
+  <input type="hidden" name="sort" value="{{ sort }}">
+  <input type="hidden" name="order" value="{{ order }}">
+  <label class="search">
+    <span class="visually-hidden">Search</span>
+    <input type="search" name="q" value="{{ filters.q }}" placeholder="Search claim, procedure, CARC or RARC"
+           onsearch="if (!this.value) this.form.submit()"
+           {% if filters.q %}autofocus onfocus="this.setSelectionRange(this.value.length, this.value.length)"{% endif %}>
+  </label>
+  <label><span class="visually-hidden">Status</span>
+  <select name="status" onchange="this.form.submit()">
     {% for s in ["pending", "approved", "overridden", "rejected", ""] %}
-    <option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>{{ s or "any status" }}</option>
+    <option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>{{ s|label if s else "Any status" }}</option>
     {% endfor %}
-  </select>
-  <select name="lane">
+  </select></label>
+  <label><span class="visually-hidden">Lane</span>
+  <select name="lane" onchange="this.form.submit()">
     {% for l in ["", "deterministic", "model", "human"] %}
-    <option value="{{ l }}" {% if filters.lane == l %}selected{% endif %}>{{ l or "any lane" }}</option>
+    <option value="{{ l }}" {% if filters.lane == l %}selected{% endif %}>{{ (l|label ~ " lane") if l else "Any lane" }}</option>
     {% endfor %}
-  </select>
-  <select name="payer">
-    <option value="">any payer</option>
+  </select></label>
+  <label><span class="visually-hidden">Payer</span>
+  <select name="payer" onchange="this.form.submit()">
+    <option value="">Any payer</option>
     {% for p in payers %}<option value="{{ p }}" {% if filters.payer == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
-  </select>
-  <button type="submit">Filter</button>
-  <span class="muted">{{ rows|length }} shown, highest dollars first</span>
+  </select></label>
+  <noscript><button type="submit">Apply</button></noscript>
+  {% if filtered %}<a class="clear" href="/">Clear filters</a>{% endif %}
 </form>
 
 <div class="panel scroll">
 <table>
   <thead><tr>
-    <th>Payer</th><th>Claim / line</th><th>Proc</th><th>CARC</th><th>RARC</th>
-    <th class="num">Denied</th><th>Lane</th><th>Proposal</th><th>Rule</th><th>Deadline</th><th>Status</th>
+    {{ th("payer", "Payer") }}
+    {{ th("claim", "Claim / line") }}
+    {{ th("proc", "Proc", tip=abbr.Proc) }}
+    {{ th("carc", "CARC", tip=abbr.CARC) }}
+    {{ th("rarc", "RARC", tip=abbr.RARC) }}
+    {{ th("denied", "Denied", cls="num") }}
+    {{ th("lane", "Lane") }}
+    {{ th("proposal", "Proposal") }}
+    {{ th("rule", "Rule") }}
+    {{ th("deadline", "Deadline") }}
+    {{ th("status", "Status") }}
   </tr></thead>
   <tbody>
   {% for r in rows %}
@@ -42,19 +74,30 @@
     <td>{{ r.payer }}</td>
     <td><a href="/denials/{{ r.id }}">{{ r.line_control_number }}</a></td>
     <td>{{ r.procedure_code }}</td>
-    <td>{{ r.primary_carc }}</td>
-    <td class="muted">{{ r.remark_codes or "—" }}</td>
+    <td><abbr title="{{ carc_desc(r.primary_carc, r.adjudication_date) }}">{{ r.primary_carc }}</abbr></td>
+    <td class="muted">{% for code in r.remark_codes.split(",") if code %}<abbr title="{{ rarc_desc(code, r.adjudication_date) }}">{{ code }}</abbr>{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</td>
     <td class="num">{{ r.denied_amount|money }}</td>
-    <td><span class="badge {{ r.lane }}">{{ r.lane }}</span></td>
-    <td>{{ r.proposed_path|replace("_", " ") }}</td>
-    <td class="muted">{{ r.rule_id or "—" }}</td>
-    <td>{{ r.filing_deadline or "—" }}{% if r.status == "pending" and r.filing_deadline and r.filing_deadline < today() %} <span class="badge unverified">expired</span>{% endif %}</td>
-    <td>{{ r.status }}{% if r.final_path %} → {{ r.final_path|replace("_", " ") }}{% endif %}</td>
+    <td><span class="badge {{ r.lane }}">{{ r.lane|label }}</span></td>
+    <td>{{ r.proposed_path|label }}</td>
+    <td class="muted">{% if r.rule_id %}<code>{{ r.rule_id }}</code>{% else %}—{% endif %}</td>
+    <td>{{ r.filing_deadline or "—" }}{% if r.status == "pending" and r.filing_deadline and r.filing_deadline < today() %} <span class="badge unverified">Expired</span>{% endif %}</td>
+    <td><span class="status {{ r.status }}">{{ r.status|label }}</span>{% if r.final_path %} → {{ r.final_path|label }}{% endif %}</td>
   </tr>
   {% else %}
-  <tr><td colspan="11" class="muted">Nothing here. Run <code>make demo</code> to generate and ingest synthetic data.</td></tr>
+  <tr><td colspan="11" class="muted empty">
+    {% if stats.total %}No denials match these filters. <a href="/">Clear filters</a>
+    {% else %}Nothing ingested yet. Run <code>make demo</code> to generate and ingest synthetic data.{% endif %}
+  </td></tr>
   {% endfor %}
   </tbody>
 </table>
 </div>
+
+{% if total %}
+<nav class="pager" aria-label="Pages">
+  <span class="muted">Showing {{ ((page - 1) * page_size + 1)|num }}–{{ [page * page_size, total]|min|num }} of {{ total|num }}</span>
+  {% if page > 1 %}<a href="/?{{ base_query }}&sort={{ sort }}&order={{ order }}&page={{ page - 1 }}">← Previous</a>{% endif %}
+  {% if page < pages %}<a href="/?{{ base_query }}&sort={{ sort }}&order={{ order }}&page={{ page + 1 }}">Next →</a>{% endif %}
+</nav>
+{% endif %}
 {% endblock %}
