@@ -24,15 +24,22 @@ a case file of authorizations, eligibility, visit records and a care note.
 
 | | Sonnet 5.5 | Haiku 4.5 | CARC lookup baseline |
 |---|---|---|---|
-| Action accuracy | 44.3% | 50.8% | 47.0% |
-| **Wrong actions asserted** | **0** | 31 | 44 |
+| Action accuracy | **67.2%** | 57.9% | 47.0% |
+| **Wrong actions asserted** | **0** | 35 | 44 |
+| Missed handoffs (asserted where a person must decide) | **0** | 23 | 0 |
 | USD per claim | $0.0063 | $0.0026 | $0 |
 
-**Accuracy ranks these models backwards.** Haiku scores higher by asserting more, and 31 of
-its assertions are wrong — mostly appeals against denials the evidence supports. Sonnet
-asserted no wrong action; its misses are handoffs to a reviewer, and one policy it was never
-told (retroactive reinstatement should be suggested, not asserted). The worst slice for both
-models is that policy: 0 of 33.
+Prompt v2, 183 cases. Sonnet never asserted a wrong action; its 60 misses are handoffs to a
+reviewer who would resolve them quickly. Haiku is cheaper and scores higher than the lookup,
+but 35 of its assertions are wrong — mostly appeals against denials its own evidence
+supports. In this domain a wrong appeal costs far more than a handoff, so the comparison
+that matters is the wrong-action row, not accuracy.
+
+The same prompt change that lifted Sonnet from 44.3% to 67.2% made Haiku *more* wrong (31 →
+35 wrong actions): prompt improvements do not transfer between models for free. Moving the
+confidence threshold out of the prompt and into code (re-scored from recordings at no cost)
+showed that for Sonnet no threshold helps — at 0.9 it degrades to the always-abstain
+baseline. [Full report](docs/EVAL_REPORT.md).
 
 The first live run scored 33%, below the baseline. Reading the model's rationales found two
 bugs in the eval, not the model — a missing input field, and synthetic visit records that no
