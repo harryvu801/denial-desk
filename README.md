@@ -66,11 +66,9 @@ the care note marked as untrusted third-party text). Filing deadlines are always
 in code. A reviewer approves, overrides or rejects; every decision is appended to an audit
 log the database refuses to update or delete.
 
-![Review queue sorted by dollars at risk, with rules-lane and human-lane proposals](docs/screenshots/review-queue.png)
+![Review queue filtered to the model lane: action, code tooltips, computed deadlines, an expired-window flag](docs/screenshots/review-queue-model-lane.png)
 
-| Rules lane: a cited, deterministic proposal | Human lane: no rule applies, a reviewer decides |
-|---|---|
-| ![Detail page for a CARC 119 denial with a write-off proposal](docs/screenshots/detail-rules-lane.png) | ![Detail page for a CARC 198 denial routed to a human](docs/screenshots/detail-human-lane.png) |
+![A model proposal: the model's rationale and confidence, the case-file items it cited outlined, the care note marked untrusted, and the review controls](docs/screenshots/detail-model-proposal.png)
 
 ## Architecture
 
