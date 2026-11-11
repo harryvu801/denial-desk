@@ -533,6 +533,11 @@ in the same commit that broke it.
 **Consequences.** CI needs an API key and costs real money per PR. Keep the gated set small
 and sampled; run the full suite nightly.
 
+*Update 2026-11-11.* With recordings (ADR-030) the gate runs on replay: no key, no spend,
+every push. The gated metrics are accuracy, cost per claim, the rules-lane share, and, at
+zero tolerance, wrong actions (ADR-031) and failures. A live sample per PR is deferred to
+ADR-030's revisit condition.
+
 **Revisit when.** CI eval spend exceeds a few dollars per PR.
 
 ---

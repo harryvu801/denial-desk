@@ -4,8 +4,9 @@ The thorough version. The public README exists to make a stranger interested in 
 seconds; this document exists so that the author can reconstruct the entire system from
 memory, and so that a technical interviewer who goes three levels deep finds something there.
 
-> Filled in as each stage completes. Current state: **MVP (rules lane + human lane + review
-> screen)**, per ADR-026. Sections for later stages are marked as not yet built.
+> Filled in as each stage completes. Current state: **rules lane + model lane (classification,
+> replayed from recordings) + human lane + review screen + CI eval gate**. Sections for later
+> stages are marked as not yet built.
 
 ---
 
@@ -188,8 +189,11 @@ Only for denials the rules hand to a human. `lane.py` runs it inside ingest: the
 turns a low-confidence action into a handoff, a corrected-claim deadline is computed in
 code, and the row stores the case file and the model's metadata (model, prompt, confidence,
 evidence paths, recorded cost). The audit actor is `model:<id>`. A handoff keeps the
-model's rationale for the reviewer. The demo uses the eval set's seed and size so every
-human-lane denial has a recording.
+model's rationale for the reviewer. The lane takes the same `as_of` the rules use: a
+corrected claim whose correction window has already closed on that date becomes a handoff
+with the deadline kept, exactly as the rules lane does. The demo uses the eval set's seed
+and size so every human-lane denial has a recording, and `dd demo` always replays, whatever
+`MODEL_LANE` says.
 
 - `schemas.py` — `ModelProposal` (action, root cause, confidence, evidence paths, rationale)
   and `strict_json_schema()`, which turns it into a structured-outputs schema: `$ref`s
@@ -205,8 +209,12 @@ human-lane denial has a recording.
 
 ### 4.8 Not yet built
 
-`retrieval/`, `agent/`, `routing/`, `review/` (beyond the screen), `security/`, `obs/`, and
-`evals/` are stubs. See CLAUDE.md for the stage plan.
+Stubs with a docstring and `TODO(stage-N)`: `retrieval/` (chunkers, index, hybrid
+retriever: stage 2), `agent/tools.py` and `agent/loop.py` (the tool-calling agent and
+appeal drafts: stage 3), `routing/confidence.py:route` (dollar-aware review depth: stage
+3), `security/` (sanitize, budgets, redaction: stage 4), `obs/` (tracing, cost
+attribution: stage 5), and the robustness and safety suites under `evals/`. See CLAUDE.md
+for the stage plan.
 
 ## 5. The evaluation system
 
@@ -253,16 +261,42 @@ prompt hash, model, effort, dataset seeds, settings minus secrets) goes to `eval
 - Round-trip: generate → parse → join reproduces exactly the labeled denied lines, with
   matching CARCs (unit test).
 - Rules lane vs ground truth: every scenario maps to the expected (lane, path) (unit test);
-  288 of 334 denials (86%) take the rules lane on the default run.
+  1,086 of 1,269 denials (86%) take the rules lane on the default run.
+- Model lane: the accuracy suite (§5.2), replayed. Error types per ADR-031, the confidence
+  floor sweep, slices by variant, root cause and payer, recorded cost and latency. A fifth,
+  reported-only count: needless handoffs whose rationale named the expected action, found
+  by a lexical match (an upper bound; a judge or human label would replace it).
 
-Classification accuracy, robustness, cost and safety suites are not built. The CI eval job
-references a runner that is still a stub.
+Robustness and safety suites are not built; asking the runner for them is an error.
+
+### 5.4 The CI gate
+
+`python -m evals.runner --suites accuracy --gate` (`make eval-gate`) runs the accuracy
+suite on the committed recordings, flattens the run record into named metrics and compares
+them with `evals/baseline.json`. The rules are in `evals/runner.py` (`GATES`): a *floor in
+points* for accuracy and the rules-lane share, a *ceiling in percent* for cost per claim,
+and an *absolute ceiling of zero* for wrong actions and for failures. The baseline holds
+only numbers and tolerances, so editing it can move a limit but never remove a check. Any
+metric without a tolerance is recorded for diffing and not gated.
+
+It runs on every push and PR with no key and no database, because replay is free
+(ADR-030). A prompt or input change without a re-recording surfaces as `missing_recording`
+failures, which fail the gate directly and again through the accuracy drop. The fix is to
+re-record deliberately and then bless the run with `--write-baseline` in its own commit
+(ADR-019). Metric extraction and tolerance arithmetic are unit-tested.
 
 ## 6. Security
 
 Current controls: no auto-submission path exists (architectural); the audit log is
-append-only at the database (architectural); synthetic data only. The injection surface
-does not exist yet because no model reads untrusted text. Threat model: stage 4.
+append-only at the database (architectural); synthetic data only; the model lane sees only
+denials the rules could not settle, and every proposal is reviewed (architectural).
+
+The injection surface exists now: the care note in each case file is third-party free text
+read by the model. Controls on it are all **probabilistic**: angle brackets are escaped so
+the note cannot close or forge a delimiter, it is wrapped in `<untrusted source="care_note">`,
+and the system prompt says delimited content is data, never instruction (ADR-020). None of
+this is measured yet; the model lane has no tools, so a successful injection could change
+an action but could not reach anything else. Threat model and the red-team suite: stage 4.
 
 ## 7. Operations
 

@@ -23,7 +23,9 @@ spend.
 
 **Sonnet asserts nothing wrong.** All 60 of its misses are handoffs, concentrated where it
 often names the right action in its rationale and then defers: units over authorization
-without an extension (17), bundling (24), unsupported medical necessity (9). **Haiku is
+without an extension (17), bundling (24), unsupported medical necessity (9). A lexical
+check finds the expected action named in 52 of those 60 rationales; that is an upper bound
+(a rationale arguing *against* the action also matches) and is reported, never gated. **Haiku is
 cheaper and asserts more, and 35 assertions are wrong** — 28 of them appeals against denials
 its own evidence supports. In this domain a wrong appeal costs money and credibility with a
 state payer; a needless handoff costs a reviewer a minute (ADR-031).
@@ -71,6 +73,14 @@ safety but never reaches zero wrong actions. Sonnet at floor 0.0 is the default.
 | 3 | prompt v2 (author); confidence floor moved to code | **67.2%** | 0 wrong, 0 missed. The same edit made Haiku more wrong (31 → 35). |
 
 Total API spend for all three runs: about $4.40.
+
+## The gate
+
+CI replays these recordings on every push (`make eval-gate`) and fails the build when,
+against `evals/baseline.json`: accuracy drops more than 2 points, cost per claim rises
+more than 15%, the rules-lane share drops more than 1 point, or there is a single wrong
+action or a single failure (a missing recording counts). The baseline is updated only in
+its own commit (ADR-019).
 
 ## Honest limits
 

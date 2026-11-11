@@ -52,7 +52,10 @@ numbers measure whether a model reads the evidence, not whether it copes with re
 Treat them as upper bounds. Prompt-injection red-teaming is not built yet.
 
 Every model number above reproduces with no API key: responses are recorded once and
-replayed (`make eval-accuracy`).
+replayed (`make eval-accuracy`). CI replays the same recordings on every push and fails
+the build if accuracy drops more than 2 points, cost per claim rises more than 15%, or a
+single wrong action or missing recording appears (`make eval-gate`, baseline in
+`evals/baseline.json`, updated only in its own commit).
 
 ## What it looks like
 
@@ -73,10 +76,10 @@ log the database refuses to update or delete.
 ## Architecture
 
 ```
- 837P files ─┐                         ┌─ playbook match ─▶ deterministic proposal ─┐
-             ├─ parse ─▶ join on ──────┤                                            ├─▶ review queue ─▶ human decision
- 835 files ──┘  (X12)   (PCN, REF*6R)  └─ no match ──────▶ needs_human ─────────────┘        │
-                                                                                   append-only decision_audit
+ 837P files ─┐                         ┌─ playbook match ─▶ deterministic proposal ──────────────┐
+             ├─ parse ─▶ join on ──────┤                                                         ├─▶ review queue ─▶ human decision
+ 835 files ──┘  (X12)   (PCN, REF*6R)  └─ no match ─▶ model lane (case file) ─▶ action or needs_human ┘        │
+                                                      replayed from recordings                      append-only decision_audit
 ```
 
 - **X12 parsing** (`ingest/x12/`) is hand-written and covers only the segments a denial
@@ -102,9 +105,10 @@ Requires Python 3.12 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 make install        # uv sync --all-extras
-make demo           # generate 500 synthetic claims, ingest them, serve http://localhost:8000
-make test           # 41 unit tests, no network, no database server
+make demo           # generate 2,000 synthetic claims, ingest them, serve http://localhost:8000
+make test           # 54 unit tests, no network, no database server
 make eval-accuracy  # model-lane eval, replayed from committed recordings (no API key)
+make eval-gate      # what CI runs: the same replay, gated against evals/baseline.json
 ```
 
 ## Scope and honesty
@@ -118,8 +122,10 @@ make eval-accuracy  # model-lane eval, replayed from committed recordings (no AP
 - **Citations.** Rules cite X12 code definitions and, for deadlines, the payer's public
   filing rule. Nevada's correction window and Idaho's manual section are not yet confirmed
   and are flagged as unverified on screen.
-- **No model lane yet.** Anything the rules don't cover goes to a person. A model-assisted
-  lane, judged against hand-labeled data, is the next stage.
+- **Model lane limits.** It classifies the next action from a case file; it does not
+  retrieve policy, draft appeals, or call tools yet (stages 2 and 3). One recorded run per
+  model per prompt, so run-to-run variance is unmeasured. A model proposal whose correction
+  window has already closed is handed to a person, as the rules lane does.
 - **Deliberately not built:** authentication, multi-tenancy, a polished frontend, real payer
   integration, auto-submission of anything (ADR-007, ADR-025).
 
