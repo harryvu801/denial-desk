@@ -34,6 +34,13 @@ BASELINE_PATH = Path(__file__).parent / "baseline.json"
 RESULTS_DIR = Path(__file__).parent / "results"
 
 BUILT_SUITES = {"accuracy"}
+DEFAULT_TOLERANCES: dict[str, float] = {
+    "accuracy_drop_pct": 2.0,
+    "wrong_action_max": 0,
+    "failures_max": 0,
+    "usd_per_claim_rise_pct": 15.0,
+    "deterministic_share_drop_pct": 1.0,
+}
 PLANNED_SUITES = {"robustness": "stage 3", "safety": "stage 4", "cost": "inside accuracy"}
 
 
@@ -135,14 +142,9 @@ def baseline_from(record: dict[str, Any], metrics: dict[str, float]) -> dict[str
         "generator_version": record["dataset"]["generator_version"],
         "n_cases": record["dataset"]["n_cases"],
         "metrics": metrics,
-        "tolerances": existing.get("tolerances")
-        or {
-            "accuracy_drop_pct": 2.0,
-            "wrong_action_max": 0,
-            "failures_max": 0,
-            "usd_per_claim_rise_pct": 15.0,
-            "deterministic_share_drop_pct": 1.0,
-        },
+        # Keep tolerances already chosen, add any a newer gate needs. Writing a baseline
+        # never loosens a tolerance; that is a hand edit in its own commit.
+        "tolerances": DEFAULT_TOLERANCES | existing.get("tolerances", {}),
     }
 
 
