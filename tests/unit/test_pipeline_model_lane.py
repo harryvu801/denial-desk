@@ -19,6 +19,7 @@ from denial_desk.ingest.generator import generate
 from denial_desk.ingest.pipeline import ingest_directory
 from denial_desk.persistence.models import DecisionAudit, DenialRow
 from denial_desk.persistence.store import make_engine, session_scope
+from denial_desk.triage.rules import triage
 
 PROMPT = Prompt("classify", "vtest", "Decide.", Template("$denial $case_file $care_note"), "t1")
 
@@ -88,3 +89,27 @@ def test_review_screen_shows_the_model_lane(tmp_path: Path, synthetic: Path) -> 
         assert row is not None and row.filing_deadline is not None  # code computed it
         page = client.get(f"/denials/{row.id}").text
     assert "Case file" in page and "untrusted" in page and "Model said" in page
+
+
+def test_expired_correction_window_goes_to_a_human(synthetic: Path) -> None:
+    """The rules lane refuses to propose a corrected claim whose window has closed; the
+    model lane must do the same, keeping the model's view for the reviewer."""
+    from datetime import date
+
+    from evals.cases import build_eval_set
+
+    case = build_eval_set(42, 300, synthetic.parent).cases[0]
+    lane, _ = _lane(0.95, ResolutionPath.CORRECTED_CLAIM)
+    handed_off = triage(case.record, as_of=case.record.adjudication_date)
+
+    fresh, meta = lane.propose(
+        case.record, case.case_file, handed_off, as_of=case.record.adjudication_date
+    )
+    assert fresh.lane.value == "model" and fresh.path is ResolutionPath.CORRECTED_CLAIM
+    assert fresh.filing_deadline is not None and "expired_correction_window" not in meta
+
+    late, meta = lane.propose(case.record, case.case_file, handed_off, as_of=date(2040, 1, 1))
+    assert late.lane.value == "human" and late.path is ResolutionPath.NEEDS_HUMAN
+    assert late.filing_deadline == fresh.filing_deadline
+    assert "correction window closed" in late.rationale and "stub" in late.rationale
+    assert meta["expired_correction_window"] is True and meta["action"] == "corrected_claim"

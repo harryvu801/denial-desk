@@ -76,11 +76,12 @@ def ingest_directory(
     denials, summary.issues = join(claims, remittances)
     case_files = load_case_files(directory)
     for record in denials:
-        resolution = triage(record, as_of=as_of or record.adjudication_date)
+        working_date = as_of or record.adjudication_date
+        resolution = triage(record, as_of=working_date)
         case_file = case_files.get(record.line_control_number)
         meta = None
         if model_lane and case_file and resolution.lane is Lane.HUMAN:
-            resolution, meta = model_lane.propose(record, case_file, resolution)
+            resolution, meta = model_lane.propose(record, case_file, resolution, as_of=working_date)
             summary.model_failures += meta["failure"] is not None
         saved = save_denial(
             session,

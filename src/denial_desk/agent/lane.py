@@ -8,6 +8,7 @@ confidence floor stays a human-lane item. Every outcome is still reviewed (ADR-0
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -40,9 +41,13 @@ class ModelLane:
         return (u.input_tokens * price_in + u.output_tokens * price_out) / 1e6
 
     def propose(
-        self, record: DenialRecord, case_file: CaseFile, handed_off: Resolution
+        self, record: DenialRecord, case_file: CaseFile, handed_off: Resolution, *, as_of: date
     ) -> tuple[Resolution, dict[str, Any]]:
-        """Return the resolution to store, plus metadata about the model call for the row."""
+        """Return the resolution to store, plus metadata about the model call for the row.
+
+        `as_of` is the working date, the same one the rules lane triages with: a corrected
+        claim whose correction window has already closed on that date is handed to a human,
+        because late filing is a good-cause judgment (the rules lane does the same)."""
         outcome = self.proposer.propose(build_request(record, case_file, self.prompt))
         meta: dict[str, Any] = {
             "model": outcome.model,
@@ -74,6 +79,18 @@ class ModelLane:
             # Deadlines are arithmetic, so code computes them, never the model (ADR-010).
             rules = payer_rules()[record.payer.value]
             deadline = rules.correction_deadline(record.submitted.service_date)
+            if deadline < as_of:
+                note = (
+                    f"{handed_off.rationale} Model ({outcome.model}) proposed a corrected"
+                    f" claim, but the {rules.name} correction window closed on {deadline}"
+                    f" (working date {as_of}). Late filing needs a good-cause decision."
+                    f" Model rationale: {proposal.rationale}"
+                )
+                meta["expired_correction_window"] = True
+                return (
+                    handed_off.model_copy(update={"rationale": note, "filing_deadline": deadline}),
+                    meta,
+                )
         return (
             Resolution(
                 patient_control_number=record.patient_control_number,
