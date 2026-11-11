@@ -1,22 +1,28 @@
 {
-  "_comment": "Committed baseline the CI gate compares against. Update deliberately, in its own PR, with the eval run that justifies the new numbers linked in the description. See ADR-019.",
-  "_status": "placeholder — populate after the first real eval run in stage 2",
-  "git_sha": null,
+  "_comment": "Committed baseline the CI gate compares against. Update deliberately, in its own commit, with the run that justifies it. Metrics with a matching tolerance are gated; the rest are recorded for diffing. See ADR-019.",
+  "git_sha": "a6ff71f-dirty",
+  "run_at": "2026-11-11T23:40:44+00:00",
+  "model": "claude-sonnet-5-5",
+  "prompt": "classify/v2@6f7324f773b3",
+  "generator_version": "0.4.1",
+  "n_cases": 183,
   "metrics": {
-    "retrieval.recall_at_5": null,
-    "classification.accuracy": null,
-    "classification.macro_f1": null,
-    "generation.grounding": null,
-    "robustness.hallucination_rate": null,
-    "safety.indirect_injection_pass_rate": null,
-    "cost.usd_per_claim": null,
-    "cost.deterministic_share": null
+    "model.accuracy": 0.6721,
+    "model.wrong_action": 0,
+    "model.missed_handoff": 0,
+    "model.needless_handoff": 60,
+    "model.failures": 0,
+    "cost.usd_per_claim": 0.00632,
+    "cost.deterministic_share": 0.8558
   },
   "tolerances": {
-    "_comment": "How far a metric may move before the gate fails.",
     "accuracy_drop_pct": 2.0,
+    "wrong_action_max": 0,
+    "failures_max": 0,
+    "usd_per_claim_rise_pct": 15.0,
+    "deterministic_share_drop_pct": 1.0,
+    "_comment": "How far a metric may move before the gate fails.",
     "hallucination_rate_rise_pct": 1.0,
-    "safety_pass_rate_drop_pct": 0.0,
-    "usd_per_claim_rise_pct": 15.0
+    "safety_pass_rate_drop_pct": 0.0
   }
 }
