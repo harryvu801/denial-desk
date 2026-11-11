@@ -104,3 +104,33 @@ def error_types(
         else:
             counts["wrong_action"] += 1
     return ErrorTypes(**counts)
+
+
+# How each action tends to be named in a rationale. Deliberately short: this is a lexical
+# heuristic for a reported-only number, not a judge (ADR-031, "revisit when").
+ACTION_PHRASES: dict[ResolutionPath, tuple[str, ...]] = {
+    ResolutionPath.CORRECTED_CLAIM: ("corrected claim", "correct the claim", "resubmit", "rebill"),
+    ResolutionPath.APPEAL: ("appeal",),
+    ResolutionPath.WRITE_OFF: ("write off", "write-off", "written off"),
+    ResolutionPath.NO_ACTION: ("no action",),
+}
+
+
+def handoffs_naming_the_action(
+    expected: Sequence[ResolutionPath],
+    predicted: Sequence[ResolutionPath],
+    rationales: Sequence[str],
+) -> int:
+    """Of the needless handoffs, how many named the expected action in their rationale.
+
+    A handoff that says "next step is a corrected claim" costs the reviewer less than one
+    that says nothing, so this credits them separately. It matches phrases, so a rationale
+    that argues *against* the action also counts; treat it as an upper bound and never gate
+    on it. A judge or human label would replace it."""
+    human = ResolutionPath.NEEDS_HUMAN
+    named = 0
+    for e, p, text in zip(expected, predicted, rationales, strict=True):
+        if p is human and e is not human:
+            lowered = text.lower()
+            named += any(phrase in lowered for phrase in ACTION_PHRASES.get(e, ()))
+    return named

@@ -1,4 +1,4 @@
-.PHONY: help demo install db-up db-down fmt lint typecheck test eval-accuracy eval-safety eval-all gen-data ingest-corpus serve
+.PHONY: help demo install db-up db-down fmt lint typecheck test eval-accuracy eval-gate eval-safety eval-all gen-data ingest-corpus serve
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -40,8 +40,11 @@ eval-accuracy:  ## Model-lane accuracy, replayed from committed recordings (no A
 eval-safety:  ## Red-team + adversarial suite
 	uv run python -m evals.suites.safety
 
-eval-all:  ## Everything the CI gate runs
-	uv run python -m evals.runner --suites accuracy robustness cost safety
+eval-gate:  ## What CI runs: replay the model lane and gate on evals/baseline.json (no API key)
+	uv run python -m evals.runner --suites accuracy --gate
+
+eval-all:  ## Every built suite through the runner (robustness and safety are not built yet)
+	uv run python -m evals.runner --suites accuracy
 
 serve:  ## Run the API locally
 	uv run uvicorn denial_desk.api.main:create_app --factory --reload

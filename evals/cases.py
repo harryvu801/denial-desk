@@ -44,7 +44,13 @@ class EvalSet:
     seed: int
     n_claims: int
     generator_version: str
+    n_denials: int  # every denied line the pipeline produced; cases are the human-lane subset
     cases: tuple[EvalCase, ...]
+
+    @property
+    def deterministic_share(self) -> float:
+        """Denials the rules settled with no model call — the headline number (ADR-006)."""
+        return 1 - len(self.cases) / self.n_denials if self.n_denials else 0.0
 
 
 def build_eval_set(seed: int, n_claims: int, root: Path = EVAL_ROOT) -> EvalSet:
@@ -79,7 +85,7 @@ def build_eval_set(seed: int, n_claims: int, root: Path = EVAL_ROOT) -> EvalSet:
                 suggestion=label["suggestion"],
             )
         )
-    return EvalSet(seed, n_claims, GENERATOR_VERSION, tuple(cases))
+    return EvalSet(seed, n_claims, GENERATOR_VERSION, len(denials), tuple(cases))
 
 
 def fit_carc_majority(train: EvalSet) -> dict[str, ResolutionPath]:

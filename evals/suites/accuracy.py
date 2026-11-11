@@ -41,7 +41,14 @@ from denial_desk.domain.models import ResolutionPath, RootCause
 from denial_desk.routing.confidence import apply_confidence_floor
 from denial_desk.security.budgets import BudgetExceededError
 from evals.cases import EvalCase, build_eval_set, fit_carc_majority
-from evals.metrics.classification import Score, abstention, by_slice, error_types, score
+from evals.metrics.classification import (
+    Score,
+    abstention,
+    by_slice,
+    error_types,
+    handoffs_naming_the_action,
+    score,
+)
 
 RESULTS_DIR = Path(__file__).parent.parent / "results"
 
@@ -161,11 +168,18 @@ def run(
             "n_claims": eval_set.n_claims,
             "generator_version": eval_set.generator_version,
             "n_cases": len(cases),
+            "n_denials": eval_set.n_denials,
+            "deterministic_share": round(eval_set.deterministic_share, 4),
             "baseline_fit_seed": settings.baseline_fit_seed,
         },
         "accuracy": {name: asdict(score(expected, p)) for name, p in predicted.items()},
         "abstention": {name: asdict(abstention(expected, p)) for name, p in predicted.items()},
         "error_types": {name: asdict(error_types(expected, p)) for name, p in predicted.items()},
+        # Reported only (lexical heuristic): needless handoffs whose rationale named the
+        # action the label expected. Credits a useful handoff without pretending it was right.
+        "handoffs_naming_the_action": handoffs_naming_the_action(
+            expected, model_pred, [o.proposal.rationale if o.proposal else "" for o in outcomes]
+        ),
         "model_by_variant": {
             k: asdict(v)
             for k, v in by_slice(cases, expected, model_pred, lambda c: c.variant).items()
@@ -212,7 +226,9 @@ def print_report(r: dict[str, Any]) -> None:
     print(f"\nModel-lane accuracy — {r['model']} · prompt {r['prompt']} · {r['proposer']}")
     if r["prompt_is_placeholder"]:
         print("  NOTE: prompt is still the placeholder; live calls are refused.")
-    print(f"  {r['dataset']['n_cases']} human-lane cases, seed {r['dataset']['seed']}\n")
+    d = r["dataset"]
+    print(f"  {d['n_cases']} human-lane cases of {d['n_denials']} denials, seed {d['seed']}"
+          f" (rules lane: {d['deterministic_share']:.1%})\n")  # fmt: skip
     print(f"  {'system':<16}{'accuracy':<20}{'abstain P / R'}")
     for name, acc in r["accuracy"].items():
         ab = r["abstention"][name]
@@ -222,6 +238,9 @@ def print_report(r: dict[str, Any]) -> None:
     for name, et in r["error_types"].items():
         print(f"  {name:<16}{et['correct']:>8}{et['needless_handoff']:>10}"
               f"{et['missed_handoff']:>8}{et['wrong_action']:>7}")  # fmt: skip
+    needless = r["error_types"]["model"]["needless_handoff"]
+    print(f"  of the model's {needless} needless handoffs, {r['handoffs_naming_the_action']}"
+          " named the expected action in the rationale (lexical match, reported only)")  # fmt: skip
     print(f"\n  confidence floor sweep (in code; this run scored at {r['confidence_floor']}):")
     print(f"  {'floor':<16}{'accuracy':>9}{'needless':>10}{'missed':>8}{'WRONG':>7}")
     for f, row in r["floor_sweep"].items():
