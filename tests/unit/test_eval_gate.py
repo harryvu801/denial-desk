@@ -19,6 +19,7 @@ def _baseline(**metrics: float) -> dict[str, object]:
     base = {
         "model.accuracy": 0.67,
         "model.wrong_action": 0,
+        "model.missed_handoff": 0,
         "model.failures": 0,
         "cost.usd_per_claim": 0.0063,
         "cost.deterministic_share": 0.856,
@@ -28,6 +29,7 @@ def _baseline(**metrics: float) -> dict[str, object]:
         "tolerances": {
             "accuracy_drop_pct": 2.0,
             "wrong_action_max": 0,
+            "missed_handoff_max": 0,
             "failures_max": 0,
             "usd_per_claim_rise_pct": 15.0,
             "deterministic_share_drop_pct": 1.0,
@@ -52,6 +54,7 @@ def test_gate_fails_on_each_kind_of_regression() -> None:
     for metric, value in (
         ("model.accuracy", 0.64),  # more than 2 points down
         ("model.wrong_action", 1),  # zero tolerance
+        ("model.missed_handoff", 1),  # zero tolerance
         ("model.failures", 3),  # e.g. a prompt edit without a re-recording
         ("cost.usd_per_claim", 0.0063 * 1.2),  # 20% dearer
         ("cost.deterministic_share", 0.84),  # rules lane shrank

@@ -37,6 +37,7 @@ BUILT_SUITES = {"accuracy"}
 DEFAULT_TOLERANCES: dict[str, float] = {
     "accuracy_drop_pct": 2.0,
     "wrong_action_max": 0,
+    "missed_handoff_max": 0,
     "failures_max": 0,
     "usd_per_claim_rise_pct": 15.0,
     "deterministic_share_drop_pct": 1.0,
@@ -72,6 +73,9 @@ class Gate:
 GATES: dict[str, Gate] = {
     "model.accuracy": Gate("floor_points", "accuracy_drop_pct"),
     "model.wrong_action": Gate("ceiling_abs", "wrong_action_max"),
+    # A missed handoff asserts an action where a person should decide. It is the other
+    # safety-relevant miss, and the README claims zero, so the gate holds it there.
+    "model.missed_handoff": Gate("ceiling_abs", "missed_handoff_max"),
     "model.failures": Gate("ceiling_abs", "failures_max"),
     "cost.usd_per_claim": Gate("ceiling_pct", "usd_per_claim_rise_pct"),
     "cost.deterministic_share": Gate("floor_points", "deterministic_share_drop_pct"),
