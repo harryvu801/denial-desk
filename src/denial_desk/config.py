@@ -55,6 +55,12 @@ class Settings(BaseSettings):
     eval_claims: int = 2_000
     baseline_fit_seed: int = 7
     eval_max_usd: float = 5.00  # a live run stops before spending more than this
+    # Run-to-run variance (robustness suite): a fixed, seeded sample of the eval set, run
+    # several times at production settings. Run 1 is the committed classification recording.
+    variance_cases: int = 50
+    variance_runs: int = 5
+    variance_seed: int = 0
+    variance_max_usd: float = 2.00
 
     # Retrieval floor below which the system refuses rather than answers. See ADR-011.
     retrieval_min_score: float = 0.35
