@@ -1,7 +1,7 @@
 {
   "_comment": "Committed baseline the CI gate compares against. Update deliberately, in its own commit, with the run that justifies it. Metrics with a matching tolerance are gated; the rest are recorded for diffing. See ADR-019.",
-  "git_sha": "a6ff71f-dirty",
-  "run_at": "2026-11-11T23:40:44+00:00",
+  "git_sha": "d7d91c5-dirty",
+  "run_at": "2026-11-12T00:04:06+00:00",
   "model": "claude-sonnet-5-5",
   "prompt": "classify/v2@6f7324f773b3",
   "generator_version": "0.4.1",
@@ -18,6 +18,7 @@
   "tolerances": {
     "accuracy_drop_pct": 2.0,
     "wrong_action_max": 0,
+    "missed_handoff_max": 0,
     "failures_max": 0,
     "usd_per_claim_rise_pct": 15.0,
     "deterministic_share_drop_pct": 1.0,
