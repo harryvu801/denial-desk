@@ -19,7 +19,9 @@
       <dt>Rule</dt><dd>{% if row.rule_id %}<code>{{ row.rule_id }}</code>{% elif row.lane == "model" %}No rule applies; proposed by the model{% else %}No rule applies{% endif %}</dd>
       <dt>Deadline</dt><dd>{{ row.filing_deadline or "—" }}
         {% if row.status == "pending" and row.filing_deadline and row.filing_deadline < today() %}<span class="badge unverified">Expired</span> {% endif %}
-        {% if row.filing_deadline and not payer_rules.verified %}<span class="badge unverified">Payer limit unverified</span>{% endif %}</dd>
+        {% set appeal = row.proposed_path == "appeal" or (row.model_meta and row.model_meta.action == "appeal") %}
+        {% if row.filing_deadline and not (payer_rules.appeal_verified if appeal else payer_rules.verified) %}<span class="badge unverified">Payer limit unverified</span>{% endif %}
+        {% if appeal and not row.filing_deadline and not payer_rules.appeal_clocks %}<span class="muted">appeal window not known for {{ payer_rules.name }}</span>{% endif %}</dd>
     </dl>
     <p>{{ row.rationale }}</p>
     {% if row.model_meta and row.model_meta.action %}

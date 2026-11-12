@@ -26,6 +26,7 @@ from denial_desk.domain.case_file import CaseFile
 from denial_desk.domain.models import DenialRecord, Lane, Resolution, ResolutionPath
 from denial_desk.reference import payer_rules
 from denial_desk.routing.confidence import apply_confidence_floor
+from denial_desk.triage.rules import proposal_deadline
 
 
 @dataclass(frozen=True)
@@ -74,23 +75,21 @@ class ModelLane:
             )
             return handed_off.model_copy(update={"rationale": note}), meta
 
-        deadline = None
-        if action is ResolutionPath.CORRECTED_CLAIM:
-            # Deadlines are arithmetic, so code computes them, never the model (ADR-010).
+        # Deadlines are arithmetic, so code computes them, never the model (ADR-010).
+        deadline = proposal_deadline(record, action)
+        if deadline is not None and deadline.date is not None and deadline.date < as_of:
             rules = payer_rules()[record.payer.value]
-            deadline = rules.correction_deadline(record.submitted.service_date)
-            if deadline < as_of:
-                note = (
-                    f"{handed_off.rationale} Model ({outcome.model}) proposed a corrected"
-                    f" claim, but the {rules.name} correction window closed on {deadline}"
-                    f" (working date {as_of}). Late filing needs a good-cause decision."
-                    f" Model rationale: {proposal.rationale}"
-                )
-                meta["expired_correction_window"] = True
-                return (
-                    handed_off.model_copy(update={"rationale": note, "filing_deadline": deadline}),
-                    meta,
-                )
+            note = (
+                f"{handed_off.rationale} Model ({outcome.model}) proposed"
+                f" {action.value.replace('_', ' ')}, but the {rules.name} {deadline.kind}"
+                f" window closed on {deadline.date} (working date {as_of}). Late filing needs"
+                f" a good-cause decision. Model rationale: {proposal.rationale}"
+            )
+            meta["expired_window"] = deadline.kind
+            return (
+                handed_off.model_copy(update={"rationale": note, "filing_deadline": deadline.date}),
+                meta,
+            )
         return (
             Resolution(
                 patient_control_number=record.patient_control_number,
@@ -98,7 +97,8 @@ class ModelLane:
                 lane=Lane.MODEL,
                 path=action,
                 rationale=proposal.rationale,
-                filing_deadline=deadline,
+                filing_deadline=deadline.date if deadline else None,
+                citations=deadline.citations if deadline else (),
                 prompt_version=outcome.prompt_id,
                 model_version=outcome.model,
             ),

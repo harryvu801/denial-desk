@@ -106,10 +106,47 @@ def test_expired_correction_window_goes_to_a_human(synthetic: Path) -> None:
         case.record, case.case_file, handed_off, as_of=case.record.adjudication_date
     )
     assert fresh.lane.value == "model" and fresh.path is ResolutionPath.CORRECTED_CLAIM
-    assert fresh.filing_deadline is not None and "expired_correction_window" not in meta
+    assert fresh.filing_deadline is not None and "expired_window" not in meta
 
     late, meta = lane.propose(case.record, case.case_file, handed_off, as_of=date(2040, 1, 1))
     assert late.lane.value == "human" and late.path is ResolutionPath.NEEDS_HUMAN
     assert late.filing_deadline == fresh.filing_deadline
     assert "correction window closed" in late.rationale and "stub" in late.rationale
-    assert meta["expired_correction_window"] is True and meta["action"] == "corrected_claim"
+    assert meta["expired_window"] == "correction" and meta["action"] == "corrected_claim"
+
+
+def test_model_appeal_gets_a_deadline_from_the_payer_clocks(synthetic: Path) -> None:
+    from datetime import date
+
+    from evals.cases import build_eval_set
+
+    cases = build_eval_set(42, 300, synthetic.parent).cases
+    lane, _ = _lane(0.95, ResolutionPath.APPEAL)
+    known = next(c for c in cases if c.record.payer.value == "NV")
+    unknown = next(c for c in cases if c.record.payer.value == "ID")
+
+    res, _ = lane.propose(
+        known.record,
+        known.case_file,
+        triage(known.record, as_of=date(2026, 1, 1)),
+        as_of=known.record.adjudication_date,
+    )
+    assert res.path is ResolutionPath.APPEAL and res.filing_deadline is not None
+    assert any("Claim Appeals" in c for c in res.citations)
+    late, meta = lane.propose(
+        known.record,
+        known.case_file,
+        triage(known.record, as_of=date(2026, 1, 1)),
+        as_of=date(2040, 1, 1),
+    )
+    assert late.path is ResolutionPath.NEEDS_HUMAN and meta["expired_window"] == "appeal"
+
+    # Idaho's window is unknown: an appeal is still proposed, with no deadline invented.
+    res, meta = lane.propose(
+        unknown.record,
+        unknown.case_file,
+        triage(unknown.record, as_of=date(2026, 1, 1)),
+        as_of=date(2040, 1, 1),
+    )
+    assert res.path is ResolutionPath.APPEAL and res.filing_deadline is None
+    assert "expired_window" not in meta

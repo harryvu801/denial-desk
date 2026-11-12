@@ -37,3 +37,17 @@ def test_reference_data_loads() -> None:
     assert "filing" in carc_table().describe("29", date(2026, 1, 1))
     assert set(payer_rules()) == {"UT", "AZ", "NV", "ID"}
     assert payer_rules()["AZ"].initial_deadline(date(2026, 1, 10)) == date(2026, 7, 10)
+
+
+def test_appeal_deadline_is_the_latest_clock_or_unknown() -> None:
+    rules = payer_rules()
+    service, remit = date(2026, 1, 10), date(2026, 3, 1)
+    # AHCCCS: 12 months from service or 60 days from the denial, whichever is later.
+    assert rules["AZ"].appeal_deadline(service, remit) == date(2027, 1, 10)
+    assert rules["AZ"].appeal_deadline(date(2025, 2, 1), remit) == date(2026, 4, 30)
+    # Nevada and Utah: 30 days from the remittance.
+    assert rules["NV"].appeal_deadline(service, remit) == date(2026, 3, 31)
+    assert rules["UT"].appeal_deadline(service, remit) == date(2026, 3, 31)
+    # Idaho: not researched yet, so no number is invented.
+    assert rules["ID"].appeal_deadline(service, remit) is None
+    assert not rules["ID"].appeal_verified and all(r.verified for r in rules.values())

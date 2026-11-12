@@ -1,14 +1,16 @@
 import json
 from collections import Counter
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
 
-from denial_desk.domain.models import Lane, ResolutionPath
+from denial_desk.domain.models import Adjustment, GroupCode, Lane, ResolutionPath
 from denial_desk.ingest.generator import generate
 from denial_desk.ingest.join import join
 from denial_desk.ingest.x12.parser_835 import parse_835
 from denial_desk.ingest.x12.parser_837p import parse_837p
+from denial_desk.reference import payer_rules
 from denial_desk.triage.rules import load_playbook, triage
 
 
@@ -86,6 +88,32 @@ def test_rules_lane_against_ground_truth(generated: Path) -> None:
         assert (res.lane, res.path) == EXPECTED[cause], cause
         if res.path is ResolutionPath.CORRECTED_CLAIM:
             assert res.filing_deadline is not None
+        if res.path is ResolutionPath.APPEAL:
+            assert (res.filing_deadline is None) == (d.payer.value == "ID")
+
+
+def test_expired_appeal_window_goes_to_a_human(generated: Path) -> None:
+    """The synthetic mix never produces a rules-lane appeal (its timely-filing denials are
+    always late), so craft one: a timely-submitted line denied with CARC 29."""
+    claims = [c for f in sorted(generated.glob("*.837")) for c in parse_837p(f.read_text())]
+    remits = [parse_835(f.read_text()) for f in sorted(generated.glob("*.835"))]
+    denials, _ = join(claims, remits)
+    base = next(d for d in denials if d.payer.value == "NV")
+    rules = payer_rules()["NV"]
+    assert base.submission_date <= rules.initial_deadline(base.submitted.service_date)
+    late_denial = Adjustment(
+        group_code=GroupCode.CONTRACTUAL, reason_code="29", amount=base.denied_amount
+    )
+    appeal = base.model_copy(
+        update={"adjudicated": base.adjudicated.model_copy(update={"adjustments": (late_denial,)})}
+    )
+
+    on_time = triage(appeal, as_of=appeal.adjudication_date)
+    assert (on_time.rule_id, on_time.path) == ("timely-filing-payer-error", ResolutionPath.APPEAL)
+    assert on_time.filing_deadline == appeal.adjudication_date + timedelta(days=30)
+    late = triage(appeal, as_of=appeal.adjudication_date + timedelta(days=31))
+    assert (late.lane, late.path) == (Lane.HUMAN, ResolutionPath.NEEDS_HUMAN)
+    assert late.rule_id == on_time.rule_id and "appeal window closed" in late.rationale
 
 
 def test_every_rule_cites_something() -> None:
@@ -96,8 +124,6 @@ def test_every_rule_cites_something() -> None:
 def test_timely_filing_labels_are_late_for_every_line(generated: Path) -> None:
     """Found at 2,000 claims: a claim labeled late from its first line's date of service
     had a later line still inside its own window, and the rules lane rightly disagreed."""
-    from denial_desk.reference import payer_rules
-
     claims = [c for f in sorted(generated.glob("*.837")) for c in parse_837p(f.read_text())]
     remits = [parse_835(f.read_text()) for f in sorted(generated.glob("*.835"))]
     denials, _ = join(claims, remits)

@@ -1,43 +1,109 @@
 {
-  "_comment": "Timely filing limits from public sources. 'verified' means the limit was confirmed against the cited public source; unverified entries are shown to reviewers as such. The federal floor (42 CFR 447.45(d)(1)) requires states to accept claims submitted within 12 months of the date of service.",
+  "_comment": "Filing, correction and appeal limits from public sources. 'verified' / 'appeal_verified' mean the limit was read in the cited public document; unverified entries are flagged to reviewers. Appeal clocks: the latest of the listed clocks applies; an empty list means the window is not known and no deadline is computed (ADR-032). The federal floor (42 CFR 447.45(d)(1)) requires states to accept claims submitted within 12 months of the date of service.",
   "payers": {
     "UT": {
       "name": "Utah Medicaid (fee-for-service)",
-      "initial_filing_limit": {"days": 365},
-      "correction_limit": {"days": 365},
+      "initial_filing_limit": {
+        "days": 365
+      },
+      "correction_limit": {
+        "days": 365
+      },
       "verified": true,
       "citations": [
+        "Utah Medicaid Provider Manual, Section I: General Information (September 2026), 11-6.4 Time Limit to Submit Medicaid Claims: 365 days from the date of service; 'any adjustments or corrections must also be received within the 365-day time period', https://medicaid.utah.gov/Documents/manuals/pdfs/Medicaid%20Provider%20Manuals/All%20Providers%20General%20Information%20Section%20I/AllProvidersGeneralInfo_Section_1.pdf",
         "Utah Medicaid Provider Agreement: amended claims accepted up to 365 days after date of service, https://medicaid.utah.gov/Documents/pdfs/agreement2011.pdf",
         "42 CFR 447.45(d)(1), https://www.ecfr.gov/current/title-42/chapter-IV/subchapter-C/part-447/subpart-A/section-447.45"
+      ],
+      "appeal_clocks": [
+        {
+          "starts": "adjudication_date",
+          "limit": {
+            "days": 30
+          }
+        }
+      ],
+      "appeal_verified": true,
+      "appeal_citations": [
+        "Utah Medicaid Provider Manual, Section I (September 2026), 5-4 Hearings and Administrative Review: 'the aggrieved person has 30 days to request a hearing' from a claim determination; adjustments or resubmissions do not extend it. Utah Admin. Code R410-14."
       ]
     },
     "AZ": {
       "name": "AHCCCS (fee-for-service)",
-      "initial_filing_limit": {"months": 6},
-      "correction_limit": {"months": 12},
+      "initial_filing_limit": {
+        "months": 6
+      },
+      "correction_limit": {
+        "months": 12
+      },
       "verified": true,
       "citations": [
-        "A.R.S. 36-2904(G); AHCCCS FFS Provider Billing Manual, Chapter 4 General Billing Rules, https://azahcccs.gov/PlansProviders/Downloads/FFSProviderManual/FFS_Chap04GeneralBillingRules.pdf"
+        "A.R.S. 36-2904(G); AHCCCS FFS Provider Billing Manual, Chapter 4 General Billing Rules, Claim Submission Time Frames: initial claim within 6 months of the date of service, clean-claim status or adjustment within 12 months, https://azahcccs.gov/PlansProviders/Downloads/FFSProviderManual/FFS_Chap04GeneralBillingRules.pdf"
+      ],
+      "appeal_clocks": [
+        {
+          "starts": "service_date",
+          "limit": {
+            "months": 12
+          }
+        },
+        {
+          "starts": "adjudication_date",
+          "limit": {
+            "days": 60
+          }
+        }
+      ],
+      "appeal_verified": true,
+      "appeal_citations": [
+        "AHCCCS FFS Provider Billing Manual, Chapter 28 Claim Disputes, Time Limits for Filing a Dispute: within 12 months from the ending date of service (or eligibility posting), or within 60 days after the denial of a timely claim, whichever is later, https://azahcccs.gov/PlansProviders/Downloads/FFSProviderManual/FFS_Chap28ClaimDisputes.pdf",
+        "The eligibility-posting clock is not modeled: the synthetic data has no retroactive eligibility postings."
       ]
     },
     "NV": {
       "name": "Nevada Medicaid (fee-for-service)",
-      "initial_filing_limit": {"days": 180},
-      "correction_limit": {"days": 180},
-      "verified": false,
+      "initial_filing_limit": {
+        "days": 180
+      },
+      "correction_limit": {
+        "days": 180
+      },
+      "verified": true,
       "citations": [
-        "Nevada Medicaid and Nevada Check Up Billing Manual, timely filing (180 days from DOS in-state; 365 out-of-state/TPL), https://www.medicaid.nv.gov/Downloads/provider/NV_Billing_General_20190318.pdf",
-        "Correction window not separately confirmed; using the initial limit."
+        "Nevada Medicaid and Nevada Check Up Billing Manual (updated 02/20/2026), Chapter 7 'What is the timely filing (stale date) period?': 180 days from the date of service for in-state claims without TPL (365 with TPL or out-of-state), https://www.medicaid.nv.gov/Downloads/provider/NV_Billing_General_20260220.pdf",
+        "Same manual, Chapter 8 'Adjustments and Voids': 'Adjustments and voids must be submitted within the stale date period outlined in Chapter 7'; resubmitting a denied claim is a resubmission under the same period."
+      ],
+      "appeal_clocks": [
+        {
+          "starts": "adjudication_date",
+          "limit": {
+            "days": 30
+          }
+        }
+      ],
+      "appeal_verified": true,
+      "appeal_citations": [
+        "Nevada Medicaid Billing Manual (02/20/2026), Chapter 8 'Claim Appeals': no later than 30 calendar days from the date on the remittance advice listing the claim as denied; no new window for a resubmitted same-service claim (MSM Chapter 100, Section 105.2C)."
       ]
     },
     "ID": {
       "name": "Idaho Medicaid (fee-for-service)",
-      "initial_filing_limit": {"days": 365},
-      "correction_limit": {"days": 365},
-      "verified": false,
+      "initial_filing_limit": {
+        "days": 365
+      },
+      "correction_limit": {
+        "days": 365
+      },
+      "verified": true,
       "citations": [
-        "42 CFR 447.45(d)(1) federal 12-month floor, https://www.ecfr.gov/current/title-42/chapter-IV/subchapter-C/part-447/subpart-A/section-447.45",
-        "Idaho manual section for the 12-month limit not yet confirmed."
+        "Idaho Medicaid Provider Handbook, General Billing Instructions (December 23, 2025), 1.12 Timely Filing Limit: complete claim submitted and ICN assigned within 12 months (365 days) of the start date of service, https://www.idmedicaid.com/General%20Information/General%20Billing%20Instructions.pdf",
+        "Same handbook, 1.12.8 Resubmissions: a resubmission beyond timely filing needs proof of timely filing attached, and services not on the original claim are denied.",
+        "42 CFR 447.45(d)(1) federal 12-month floor, https://www.ecfr.gov/current/title-42/chapter-IV/subchapter-C/part-447/subpart-A/section-447.45"
+      ],
+      "appeal_clocks": [],
+      "appeal_verified": false,
+      "appeal_citations": [
+        "Not found in the General Billing Instructions; its Appeals section defers to the 'General Information and Requirements for Providers' handbook, which has not been read yet. No deadline is computed for Idaho appeals."
       ]
     }
   }

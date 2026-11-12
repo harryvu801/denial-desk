@@ -9,9 +9,11 @@ See ADR-006, ADR-026.
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import date
 from functools import cache
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel
@@ -34,6 +36,30 @@ CONDITIONS: dict[str, Callable[[DenialRecord], bool]] = {
     "submitted_within_initial_deadline": lambda r: not _initial_deadline_passed(r),
     "prior_auth_absent": lambda r: r.prior_auth_number is None,
 }
+
+
+@dataclass(frozen=True)
+class Deadline:
+    """A computed deadline with the window it came from, or no deadline when the payer's
+    window is unknown (`kind` still says which window would apply)."""
+
+    kind: Literal["correction", "appeal"]
+    date: date | None
+    citations: tuple[str, ...]
+
+
+def proposal_deadline(record: DenialRecord, path: ResolutionPath) -> Deadline | None:
+    """The deadline a proposal carries. Arithmetic lives here, in code, never in a model
+    (ADR-010): corrected claims run from the date of service, appeals from the payer's
+    clocks (ADR-032). Other actions have no deadline."""
+    rules = payer_rules()[record.payer.value]
+    service = record.submitted.service_date
+    if path is ResolutionPath.CORRECTED_CLAIM:
+        return Deadline("correction", rules.correction_deadline(service), rules.citations)
+    if path is ResolutionPath.APPEAL:
+        deadline = rules.appeal_deadline(service, record.adjudication_date)
+        return Deadline("appeal", deadline, rules.appeal_citations)
+    return None
 
 
 class Match(BaseModel, frozen=True):
@@ -84,8 +110,8 @@ def triage(record: DenialRecord, *, as_of: date, playbook: Playbook | None = Non
     for rule in playbook.rules:
         if not rule.match.matches(record):
             continue
-        rules = payer_rules()[record.payer.value]
-        if rule.action is not ResolutionPath.CORRECTED_CLAIM:
+        deadline = proposal_deadline(record, rule.action)
+        if deadline is None:
             return Resolution(
                 patient_control_number=record.patient_control_number,
                 line_control_number=record.line_control_number,
@@ -95,11 +121,11 @@ def triage(record: DenialRecord, *, as_of: date, playbook: Playbook | None = Non
                 rationale=rule.rationale.strip(),
                 citations=rule.citations,
             )
-        deadline = rules.correction_deadline(record.submitted.service_date)
-        citations = (*rule.citations, *rules.citations)
-        if deadline < as_of:
-            # Proposing a correction that can no longer be filed is worse than proposing
+        citations = (*rule.citations, *deadline.citations)
+        if deadline.date is not None and deadline.date < as_of:
+            # Proposing a filing that can no longer be made is worse than proposing
             # nothing: whether good cause exists for late filing is a human judgment.
+            rules = payer_rules()[record.payer.value]
             return Resolution(
                 patient_control_number=record.patient_control_number,
                 line_control_number=record.line_control_number,
@@ -107,12 +133,12 @@ def triage(record: DenialRecord, *, as_of: date, playbook: Playbook | None = Non
                 path=ResolutionPath.NEEDS_HUMAN,
                 rule_id=rule.id,
                 rationale=(
-                    f"Rule {rule.id} would propose a corrected claim, but the {rules.name}"
-                    f" correction window closed on {deadline} (working date {as_of})."
-                    " Late filing needs a good-cause decision."
+                    f"Rule {rule.id} would propose {rule.action.value.replace('_', ' ')},"
+                    f" but the {rules.name} {deadline.kind} window closed on {deadline.date}"
+                    f" (working date {as_of}). Late filing needs a good-cause decision."
                 ),
                 citations=citations,
-                filing_deadline=deadline,
+                filing_deadline=deadline.date,
             )
         return Resolution(
             patient_control_number=record.patient_control_number,
@@ -122,7 +148,7 @@ def triage(record: DenialRecord, *, as_of: date, playbook: Playbook | None = Non
             rule_id=rule.id,
             rationale=rule.rationale.strip(),
             citations=citations,
-            filing_deadline=deadline,
+            filing_deadline=deadline.date,
         )
     return Resolution(
         patient_control_number=record.patient_control_number,
