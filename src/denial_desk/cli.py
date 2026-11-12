@@ -82,6 +82,16 @@ def demo() -> None:
 
 
 @app.command()
+def fetch_corpus(out: Path = Path("data/corpus")) -> None:
+    """Download the public payer manuals and extract their text, with a manifest."""
+    from denial_desk.retrieval.corpus import fetch_corpus as run
+
+    for doc in run(out):
+        typer.echo(f"{doc.id:<20} {doc.pages:>4} pages {doc.chars:>8} chars  {doc.sha256[:12]}")
+    typer.echo(f"manifest: {out / 'manifest.json'}")
+
+
+@app.command()
 def resolve(claim: str) -> None:
     """Resolve a single denial and print the proposed resolution."""
     raise NotImplementedError

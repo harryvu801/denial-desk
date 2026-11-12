@@ -1,4 +1,4 @@
-.PHONY: help demo install db-up db-down fmt lint typecheck test eval-accuracy eval-gate eval-safety eval-all gen-data ingest-corpus serve
+.PHONY: help demo install db-up db-down fmt lint typecheck test eval-accuracy eval-gate eval-safety eval-all gen-data fetch-corpus ingest-corpus serve
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -31,7 +31,10 @@ demo:  ## Rebuild the demo (2,000 synthetic claims, model lane replayed) and ser
 gen-data:  ## Generate the synthetic 837P/835 corpus into data/synthetic
 	uv run dd generate --claims 2000 --seed 42
 
-ingest-corpus:  ## Download and index the public policy corpus into pgvector
+fetch-corpus:  ## Download the public payer manuals into data/corpus and extract their text
+	uv run dd fetch-corpus
+
+ingest-corpus:  ## Index the corpus (stage 2, not built yet)
 	uv run dd ingest-corpus
 
 eval-accuracy:  ## Model-lane accuracy, replayed from committed recordings (no API key)
