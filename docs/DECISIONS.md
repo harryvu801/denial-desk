@@ -905,12 +905,111 @@ but named the right action in the rationale) — that is a fifth category worth 
 
 ---
 
+## ADR-032 — Appeal deadlines are computed from payer clocks; an unknown window gets no number
+
+**Status:** accepted
+
+**Context.** The MVP computed correction deadlines but showed "—" for appeals because the
+windows had not been researched. Reading the four payers' manuals (docs/notes/2026-11-11)
+found three different shapes: Nevada and Utah count 30 days from the remittance; AHCCCS
+allows the later of 12 months from the date of service or 60 days from the denial; Idaho's
+claim-appeal window is in a handbook not yet read.
+
+**Decision.** `PayerRules` carries a list of appeal clocks, each a start (date of service
+or adjudication date) and a limit; the deadline is the latest clock. The 835 payment date
+(BPR16) stands in for the remittance date. An empty list means unknown: no deadline is
+computed and the screen says "appeal window not known", with its own `appeal_verified`
+flag. Both lanes compute the deadline through one function, `proposal_deadline`, and an
+appeal whose window has closed on the working date is handed to a human, exactly as an
+expired correction is.
+
+**Why.** Deadlines are arithmetic with legal consequences, so they stay in code (ADR-010).
+Modeling the clocks rather than a single number is what makes AHCCCS's "whichever is later"
+representable without special-casing a payer. Refusing to invent Idaho's number is the same
+principle as the refusal floor: a blank a biller will check beats a figure they will trust.
+
+**Alternatives.** A single appeal limit in days per payer — cannot express AHCCCS, and
+would have forced a guess for Idaho. Asking the model to state the window — ADR-010 rules it
+out. Treating the submission date as the clock start — wrong for every payer read.
+
+**Consequences.** AHCCCS's eligibility-posting clock is not modeled (no retroactive postings
+in the synthetic data). Idaho appeals carry no deadline until the "General Information and
+Requirements for Providers" handbook is read and cited.
+
+**Revisit when.** Idaho's window is cited, or a payer counts from a notice date the 835 does
+not carry.
+
+---
+
+## ADR-033 — Embeddings are a local open-weights model, with hosted models as the measured comparison
+
+**Status:** accepted
+
+**Context.** Stage 2 needs an embedding model for dense retrieval (ADR-009). The repo's
+standing promise is that every number reproduces with no API key (ADR-030). Hosted
+embedders are stronger on retrieval benchmarks and cheap at this corpus size (a few hundred
+pages), but each adds a vendor, a key and a recording discipline for embeddings.
+
+**Decision.** `BAAI/bge-m3` run locally is the default embedder for the index and the
+evals. Hosted models (Voyage `voyage-3-large` first) are added as a measured comparison once
+the retrieval golden set exists, through the same `Embedder` interface, and the comparison
+goes in the eval report.
+
+**Why.** Keyless reproducibility is worth more here than a few points of recall: the eval
+report, CI gate and demo all run without credentials today, and a hosted embedder would
+break that unless embeddings were recorded too. bge-m3 also produces sparse and dense
+vectors from one model, which keeps the hybrid comparison (ADR-009) to one dependency. The
+comparison against a hosted model is itself the deliverable: "we measured and local was
+within N points" or "hosted won by N and here is what it costs" are both good answers.
+
+**Alternatives.** Voyage as the default — stronger, Anthropic-adjacent, breaks keyless
+replay. OpenAI `text-embedding-3-small` — cheapest hosted, third vendor, weaker. A smaller
+local model (`bge-small`) — faster, but the quality gap would muddy the chunker comparison.
+
+**Consequences.** A torch-sized dependency and a ~2 GB model download the first time;
+indexing on a laptop CPU takes minutes, not seconds. The eval record carries the model name
+and revision (ADR-017).
+
+**Revisit when.** The retrieval golden set shows the local model more than ~5 points of
+recall@5 behind a hosted one, or CI runtime for indexing exceeds a few minutes.
+
+---
+
+## ADR-034 — Reranking is a local cross-encoder, and the refusal floor is calibrated on its scores
+
+**Status:** accepted
+
+**Context.** Hybrid retrieval (ADR-009) fuses BM25 and dense candidates and reranks them.
+The refusal floor (ADR-011) is a threshold on the reranker's top score, so the reranker
+choice fixes the floor's scale.
+
+**Decision.** `BAAI/bge-reranker-v2-m3`, run locally, reranks the fused top-k. Hosted
+rerankers (Cohere Rerank, Voyage rerank-2.5) are a measured comparison, not the default.
+`retrieval_min_score` is calibrated on this reranker's score distribution over the golden
+set, and the calibration is recorded with the run.
+
+**Why.** The same keyless-reproducibility reason as ADR-033, plus latency: a cross-encoder
+over 20 candidates is a few hundred milliseconds on CPU, inside the ADR-009 budget. Tying
+the floor to one named reranker makes the floor a measured quantity rather than a number
+copied between systems with different score scales.
+
+**Alternatives.** Cohere Rerank — highest quality in current comparisons, per-search
+pricing, third vendor. No reranker, fusion only — simpler, and the eval will say what it
+costs; keep it as the ablation row.
+
+**Consequences.** Changing the reranker invalidates the floor; the eval report must say
+which reranker a floor belongs to.
+
+**Revisit when.** p95 retrieval latency exceeds 300 ms (ADR-009), or the ablation shows the
+reranker adds nothing on this corpus.
+
+---
+
 ## Decisions still open
 
 Record these here as they are made, with the same format.
 
-- **Embedding model.** Pick in stage 2 and record the comparison that justified it.
-- **Reranker.** Cross-encoder locally vs a hosted reranking API — cost and latency tradeoff.
+- ~~Embedding model~~ — ADR-033. ~~Reranker~~ — ADR-034.
 - **Online eval sampling rate.** What fraction of live traffic gets judge-scored.
 - **Corpus refresh.** NCCI files are quarterly; decide whether re-indexing is manual or
   scheduled, and how version skew between a denial and the corpus is handled.
