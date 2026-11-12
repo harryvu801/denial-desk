@@ -30,7 +30,8 @@ a case file of authorizations, eligibility, visit records and a care note.
 | USD per claim | $0.0063 | $0.0026 | $0 |
 
 Prompt v2, 183 cases. Sonnet never asserted a wrong action; its 60 misses are handoffs to a
-reviewer who would resolve them quickly. Haiku is cheaper and scores higher than the lookup,
+reviewer who would resolve them quickly (52 of the 60 name the expected action in their
+rationale). Haiku is cheaper and scores higher than the lookup,
 but 35 of its assertions are wrong — mostly appeals against denials its own evidence
 supports. In this domain a wrong appeal costs far more than a handoff, so the comparison
 that matters is the wrong-action row, not accuracy.
@@ -40,6 +41,18 @@ The same prompt change that lifted Sonnet from 44.3% to 67.2% made Haiku *more* 
 confidence threshold out of the prompt and into code (re-scored from recordings at no cost)
 showed that for Sonnet no threshold helps — at 0.9 it degrades to the always-abstain
 baseline. [Full report](docs/EVAL_REPORT.md).
+
+**Run-to-run variance** (the same 50 cases, five runs each, replayed from recordings):
+
+| | Sonnet 5.5 | Haiku 4.5 |
+|---|---|---|
+| Accuracy, mean (min to max) | 74.4% (74 to 76) | 59.6% (56 to 64) |
+| Cases that changed their answer across runs | 1 of 50 | 18 of 50 |
+| Cases wrong in at least one run | **0** | 23 |
+
+Sonnet's answer is stable, so differences of a few points between its runs are noise and
+larger ones are not. Haiku's is not: a single Haiku run overstates or understates it by up
+to four points, and more than a third of its cases flip between runs.
 
 The first live run scored 33%, below the baseline. Reading the model's rationales found two
 bugs in the eval, not the model — a missing input field, and synthetic visit records that no
@@ -90,8 +103,9 @@ log the database refuses to update or delete.
   responsibility and not CO-45 (fee-schedule reduction, which is on nearly every paid line).
 - **The rules lane** (`triage/playbook.yaml`) has 13 entries keyed on CARC, plus RARC and a
   condition where one is needed. Each entry cites the code definition it relies on. Filing
-  deadlines are computed in Python from public payer rules (`reference/payers.json`), and
-  the screen flags payers whose limits are not yet verified.
+  and appeal deadlines are computed in Python from public payer rules
+  (`reference/payers.json`, each limit citing the manual section it was read from); where
+  a window is unknown the screen says so instead of showing a number.
 - **Persistence** is SQLAlchemy over SQLite by default and Postgres via `DATABASE_URL`.
   Ingest is idempotent: an 835 is skipped by its TRN02 trace number, and each denial is
   unique on (patient control number, line control number).
@@ -109,6 +123,7 @@ make demo           # generate 2,000 synthetic claims, ingest them, serve http:/
 make test           # 54 unit tests, no network, no database server
 make eval-accuracy  # model-lane eval, replayed from committed recordings (no API key)
 make eval-gate      # what CI runs: the same replay, gated against evals/baseline.json
+make eval-variance  # run-to-run variance, five recorded runs on 50 cases (no API key)
 ```
 
 ## Scope and honesty
@@ -119,13 +134,13 @@ make eval-gate      # what CI runs: the same replay, gated against evals/baselin
 - **Narrow X12.** The parsers read only the loops this system needs. Real clearinghouse files
   contain more, which is skipped. Reversals (CLP02 = 22) are reported and skipped; pairing a
   reversal with its re-adjudication is not built.
-- **Citations.** Rules cite X12 code definitions and, for deadlines, the payer's public
-  filing rule. Nevada's correction window and Idaho's manual section are not yet confirmed
-  and are flagged as unverified on screen.
+- **Citations.** Rules cite X12 code definitions and, for deadlines, the payer manual
+  section the limit was read from. Idaho's claim-appeal window has not been read yet, so
+  Idaho appeals carry no deadline and the screen says so. AHCCCS's eligibility-posting
+  clock is not modeled.
 - **Model lane limits.** It classifies the next action from a case file; it does not
-  retrieve policy, draft appeals, or call tools yet (stages 2 and 3). One recorded run per
-  model per prompt, so run-to-run variance is unmeasured. A model proposal whose correction
-  window has already closed is handed to a person, as the rules lane does.
+  retrieve policy, draft appeals, or call tools yet (stages 2 and 3). A proposal whose
+  filing or appeal window has already closed is handed to a person, as the rules lane does.
 - **Deliberately not built:** authentication, multi-tenancy, a polished frontend, real payer
   integration, auto-submission of anything (ADR-007, ADR-025).
 

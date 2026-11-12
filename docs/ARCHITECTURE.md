@@ -145,15 +145,20 @@ corrected-claim deadline is already past on that date, the proposal becomes `nee
 production; synthetic data is *replayed*, each denial triaged as of its own 835 payment date.
 The screen separately badges pending items whose deadline has passed since ingest.
 
-Corrected-claim proposals get a deadline from the payer's correction window. Appeals don't
-get one yet: appeal windows weren't researched for the MVP, so the screen shows "—" rather
-than guessing.
+Corrected-claim proposals get a deadline from the payer's correction window, counted from
+the date of service. Appeals get one from the payer's appeal clocks (ADR-032): Nevada and
+Utah count 30 days from the remittance, AHCCCS the later of 12 months from service or 60
+days from the denial, and Idaho's window has not been read, so Idaho appeals carry no
+deadline and the screen says so. `proposal_deadline` in `triage/rules.py` is the one
+place this arithmetic lives, and both lanes use it.
 
 ### 4.4 `reference/` — committed facts
 
 `carc.json`, `rarc.json` (only codes in use, shortened descriptions, with a source line),
-`payers.json` (filing limits with citations and a `verified` flag). Unverified payers (NV's
-correction window, ID's manual section) are flagged on the review screen.
+`payers.json` (filing, correction and appeal limits, each citing the manual section it was
+read from, with `verified` and `appeal_verified` flags). All four filing limits are
+verified as of 2026-11-11; Idaho's appeal window is the one unverified entry, and the
+review screen flags it. Sources and quotes: `docs/notes/2026-11-11-research.md`.
 
 ### 4.5 `persistence/` — schema
 
@@ -267,7 +272,13 @@ prompt hash, model, effort, dataset seeds, settings minus secrets) goes to `eval
   reported-only count: needless handoffs whose rationale named the expected action, found
   by a lexical match (an upper bound; a judge or human label would replace it).
 
-Robustness and safety suites are not built; asking the runner for them is an error.
+- Run-to-run variance (`evals/suites/robustness.py`): a seeded 50-case sample, five runs
+  per model, replayed from `data/recordings/variance/`. Sonnet: stdev 0.9 points, 49 of 50
+  unanimous, no wrong action in any run. Haiku: stdev 3.0, 18 of 50 flip, 23 wrong in at
+  least one run.
+
+The rest of the robustness suite (prompt sensitivity, degraded retrieval, the adversarial
+set) and the safety suite are not built; asking the runner for them is an error.
 
 ### 5.4 The CI gate
 
@@ -329,6 +340,7 @@ SQLite at `data/denial_desk.db` (gitignored); delete it to reset. Postgres via
 ## 9. Open questions
 
 - Which real-world source, if any, can calibrate the denial-mix weights?
-- Appeal windows per payer: not yet researched, so appeals carry no deadline.
+- Idaho's claim-appeal window: in the "General Information and Requirements for
+  Providers" handbook, not yet read. Until then Idaho appeals carry no deadline.
 - How should reversal + re-adjudication pairs update an existing denial without breaking the
   audit history?

@@ -1,4 +1,4 @@
-.PHONY: help demo install db-up db-down fmt lint typecheck test eval-accuracy eval-gate eval-safety eval-all gen-data fetch-corpus ingest-corpus serve
+.PHONY: help demo install db-up db-down fmt lint typecheck test eval-accuracy eval-gate eval-variance eval-safety eval-all gen-data fetch-corpus ingest-corpus serve
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -39,6 +39,9 @@ ingest-corpus:  ## Index the corpus (stage 2, not built yet)
 
 eval-accuracy:  ## Model-lane accuracy, replayed from committed recordings (no API key)
 	uv run python -m evals.suites.accuracy
+
+eval-variance:  ## Run-to-run variance of the model lane, replayed from recordings (no API key)
+	uv run python -m evals.suites.robustness
 
 eval-safety:  ## Red-team + adversarial suite
 	uv run python -m evals.suites.safety

@@ -64,6 +64,30 @@ For Sonnet no floor helps: at 0.9 it collapses to the always-abstain baseline, w
 the 0.9 threshold in the prompt draft would have done. For Haiku a floor trades accuracy for
 safety but never reaches zero wrong actions. Sonnet at floor 0.0 is the default.
 
+## Run-to-run variance
+
+`uv run python -m evals.suites.robustness [--model …]`, replayed from
+`data/recordings/variance/`. The same 50 cases (a seeded sample of the 183; the sample is
+easier than the whole set, so its accuracies are not comparable with the headline), five
+runs at production settings. Run 1 is the committed classification recording; runs 2 to 5
+were recorded on 2026-11-12 for $1.78 in total.
+
+| | Sonnet 5.5 | Haiku 4.5 |
+|---|---|---|
+| Accuracy per run | 76, 74, 74, 74, 74 | 58, 60, 64, 60, 56 |
+| Mean (stdev) | 74.4% (0.9) | 59.6% (3.0) |
+| Wrong actions per run | 0, 0, 0, 0, 0 | 9, 8, 7, 8, 8 |
+| Unanimous cases | 49 of 50 | 32 of 50 |
+| Cases wrong in at least one run | 0 | 23 |
+| Majority vote | 74.0%, 0 wrong | 62.0%, 8 wrong |
+
+Sonnet's one flip was a `no_extension` case answered `write_off` once and `needs_human`
+four times: a handoff either way in cost terms. Haiku's 18 flips include six retroactive
+reinstatement cases that alternate between `appeal`, `corrected_claim` and `needs_human`,
+and three `no_coverage` write-offs that become appeals in some runs. So the zero wrong
+actions in the headline is a property of Sonnet on this prompt, not of a lucky run, and
+Haiku's wrong-action count would not be fixed by picking a better run.
+
 ## Run history
 
 | Run | What changed | Sonnet acc. | Finding |
@@ -86,8 +110,8 @@ its own commit (ADR-019).
 
 - The case files and the prompt are written by the same people, so this measures whether a
   model reads the evidence, not whether it copes with a real case file (ADR-029).
-- One recorded run per model per prompt. Model output is not deterministic and run-to-run
-  variance is not yet measured. Treat differences of a few points as noise.
+- The headline is one recorded run per model. The variance section bounds the noise: about
+  one point for Sonnet, three to four for Haiku on a 50-case sample.
 - 183 cases; per-variant slices are 9–35 cases.
 
 ## Not yet built
